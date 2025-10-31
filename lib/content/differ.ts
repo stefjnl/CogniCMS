@@ -76,7 +76,8 @@ export function diffWebsiteContent(
   }
 
   if (
-    toComparable(previous.metadata?.title) !== toComparable(next.metadata?.title)
+    toComparable(previous.metadata?.title) !==
+    toComparable(next.metadata?.title)
   ) {
     changes.push({
       sectionId: "metadata",
@@ -113,7 +114,7 @@ export function diffWebsiteContent(
     : Object.entries(previous.sections).map(([id, section]: [string, any]) => ({
         id,
         label: section.label || id,
-        type: section.type || 'content',
+        type: section.type || "content",
         content: section.content || section,
       }));
 
@@ -122,12 +123,15 @@ export function diffWebsiteContent(
     : Object.entries(next.sections).map(([id, section]: [string, any]) => ({
         id,
         label: section.label || id,
-        type: section.type || 'content',
+        type: section.type || "content",
         content: section.content || section,
       }));
 
   const previousSections = new Map(
-    previousSectionsArray.map((section: WebsiteSection) => [section.id, section])
+    previousSectionsArray.map((section: WebsiteSection) => [
+      section.id,
+      section,
+    ])
   );
   const nextSections = new Map(
     nextSectionsArray.map((section: WebsiteSection) => [section.id, section])

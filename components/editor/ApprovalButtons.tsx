@@ -26,7 +26,9 @@ export function ApprovalButtons({
           <p className="text-sm font-medium text-slate-900">
             {changeCount} {changeCount === 1 ? "change" : "changes"} ready
           </p>
-          <p className="text-xs text-slate-600">Review changes before publishing</p>
+          <p className="text-xs text-slate-600">
+            Review changes before publishing
+          </p>
         </div>
         <div className="flex gap-2">
           <Button onClick={onPublish} disabled={disabled}>

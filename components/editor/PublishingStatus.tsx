@@ -55,7 +55,10 @@ export function PublishingStatus({
           <div className="flex-1">
             <p className="font-medium text-blue-900">Publishing to GitHub...</p>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-blue-200">
-              <div className="h-full animate-pulse bg-blue-500" style={{ width: "70%" }} />
+              <div
+                className="h-full animate-pulse bg-blue-500"
+                style={{ width: "70%" }}
+              />
             </div>
           </div>
         </div>
@@ -93,7 +96,9 @@ export function PublishingStatus({
           <span className="text-2xl">❌</span>
           <div>
             <p className="font-medium text-red-900">Publishing failed</p>
-            <p className="text-sm text-red-700">{message || "An error occurred"}</p>
+            <p className="text-sm text-red-700">
+              {message || "An error occurred"}
+            </p>
           </div>
         </div>
       </div>

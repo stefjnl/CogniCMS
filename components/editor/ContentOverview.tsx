@@ -13,8 +13,8 @@ export function ContentOverview({ content }: ContentOverviewProps) {
   );
 
   // Debug logging
-  console.log('ContentOverview - content:', content);
-  console.log('ContentOverview - sections:', content?.sections);
+  console.log("ContentOverview - content:", content);
+  console.log("ContentOverview - sections:", content?.sections);
 
   if (!content || !content.sections) {
     return (
@@ -30,7 +30,7 @@ export function ContentOverview({ content }: ContentOverviewProps) {
     : Object.entries(content.sections).map(([id, section]: [string, any]) => ({
         id,
         label: section.label || id,
-        type: section.type || 'content',
+        type: section.type || "content",
         content: section.content || section,
       }));
 

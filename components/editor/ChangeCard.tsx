@@ -10,7 +10,12 @@ interface ChangeCardProps {
   compact?: boolean;
 }
 
-export function ChangeCard({ change, onApply, onReject, compact = false }: ChangeCardProps) {
+export function ChangeCard({
+  change,
+  onApply,
+  onReject,
+  compact = false,
+}: ChangeCardProps) {
   const formatValue = (value: unknown): string => {
     if (typeof value === "string") return value;
     return JSON.stringify(value, null, 2);

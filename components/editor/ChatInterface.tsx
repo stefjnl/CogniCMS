@@ -180,7 +180,7 @@ export function ChatInterface({
       setPreviewChanges([]);
       setPublishState("published");
       setStatusMessage(payload.message ?? "Changes published successfully.");
-      
+
       // Reset to idle after 5 seconds
       setTimeout(() => {
         setPublishState("idle");
@@ -193,7 +193,10 @@ export function ChatInterface({
   }, [commitMessage, draftContent, site.id]);
 
   const disablePublish = useMemo(
-    () => publishState === "publishing" || isChatStreaming || previewChanges.length === 0,
+    () =>
+      publishState === "publishing" ||
+      isChatStreaming ||
+      previewChanges.length === 0,
     [publishState, isChatStreaming, previewChanges.length]
   );
 
@@ -249,26 +252,29 @@ export function ChatInterface({
       <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[2fr,3fr]">
         {/* Left Column: Chat Panel */}
         <div className="flex flex-col space-y-4">
-          <div className="h-96 overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:h-auto" style={{ maxHeight: 'calc(100vh - 20rem)' }}>
-            <MessageList 
-              messages={visibleMessages} 
+          <div
+            className="h-96 overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:h-auto"
+            style={{ maxHeight: "calc(100vh - 20rem)" }}
+          >
+            <MessageList
+              messages={visibleMessages}
               changes={previewChanges}
               lastAssistantMessageId={lastAppliedAssistantId}
             />
           </div>
-          
+
           <MessageInput
             onSend={handleSend}
             disabled={isChatStreaming || publishState === "publishing"}
           />
-          
+
           {showSpinner && (
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <LoadingSpinner />
               <span>AI is thinking...</span>
             </div>
           )}
-          
+
           {clientError && (
             <div className="rounded-lg border border-red-200 bg-red-50 p-3">
               <p className="text-sm text-red-700">{clientError}</p>
@@ -279,17 +285,22 @@ export function ChatInterface({
         {/* Right Column: Preview Panel */}
         <div className="space-y-4">
           <ContentOverview content={draftContent} />
-          
+
           <PreviewPanel draftContent={draftContent} changes={previewChanges} />
-          
+
           <PublishingStatus
             state={publishState}
             changeCount={previewChanges.length}
             message={statusMessage || undefined}
             onPublish={handlePublish}
-            onViewLive={() => window.open(`https://${site.githubOwner}.github.io/${site.githubRepo}/`, '_blank')}
+            onViewLive={() =>
+              window.open(
+                `https://${site.githubOwner}.github.io/${site.githubRepo}/`,
+                "_blank"
+              )
+            }
           />
-          
+
           <ApprovalButtons
             onPublish={handlePublish}
             onReset={handleReset}

@@ -22,10 +22,12 @@ export function PreviewPanel({ draftContent, changes }: PreviewPanelProps) {
             Proposed Changes
           </h3>
         </div>
-        
+
         <div className="p-4">
           {changes.length === 0 ? (
-            <p className="text-center text-sm text-slate-500">No changes detected.</p>
+            <p className="text-center text-sm text-slate-500">
+              No changes detected.
+            </p>
           ) : (
             <div className="space-y-3">
               {changes.map((change, idx) => (
@@ -36,7 +38,9 @@ export function PreviewPanel({ draftContent, changes }: PreviewPanelProps) {
                   <div className="mb-2 flex items-center gap-2">
                     <span className="text-lg">✏️</span>
                     <div className="flex-1">
-                      <p className="font-medium text-slate-900">{change.sectionLabel}</p>
+                      <p className="font-medium text-slate-900">
+                        {change.sectionLabel}
+                      </p>
                       <p className="text-xs text-slate-500">{change.field}</p>
                     </div>
                   </div>

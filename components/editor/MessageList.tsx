@@ -88,14 +88,20 @@ interface MessageListProps {
   lastAssistantMessageId?: string | null;
 }
 
-export function MessageList({ messages, changes = [], lastAssistantMessageId }: MessageListProps) {
+export function MessageList({
+  messages,
+  changes = [],
+  lastAssistantMessageId,
+}: MessageListProps) {
   // Empty state when no messages
   if (messages.length === 0) {
     return (
       <div className="py-12 text-center">
         <div className="mx-auto max-w-md space-y-4">
           <div className="text-4xl">👋</div>
-          <h3 className="text-lg font-semibold text-slate-900">Welcome to CogniCMS</h3>
+          <h3 className="text-lg font-semibold text-slate-900">
+            Welcome to CogniCMS
+          </h3>
           <p className="text-sm text-slate-600">Try asking:</p>
           <ul className="space-y-2 text-left text-sm text-slate-700">
             <li className="rounded bg-slate-50 px-4 py-2">
@@ -108,7 +114,9 @@ export function MessageList({ messages, changes = [], lastAssistantMessageId }: 
               • "Add a new FAQ item"
             </li>
           </ul>
-          <p className="text-xs text-slate-500">I can edit any text on your site!</p>
+          <p className="text-xs text-slate-500">
+            I can edit any text on your site!
+          </p>
         </div>
       </div>
     );
@@ -124,7 +132,8 @@ export function MessageList({ messages, changes = [], lastAssistantMessageId }: 
           return null;
         }
 
-        const isLastAssistant = role === "assistant" && message.id === lastAssistantMessageId;
+        const isLastAssistant =
+          role === "assistant" && message.id === lastAssistantMessageId;
         const showChanges = isLastAssistant && changes.length > 0;
 
         return (
@@ -150,7 +159,11 @@ export function MessageList({ messages, changes = [], lastAssistantMessageId }: 
             {showChanges && (
               <div className="ml-8 space-y-2">
                 {changes.map((change, idx) => (
-                  <ChangeCard key={`${change.sectionId}-${change.field}-${idx}`} change={change} compact />
+                  <ChangeCard
+                    key={`${change.sectionId}-${change.field}-${idx}`}
+                    change={change}
+                    compact
+                  />
                 ))}
               </div>
             )}
