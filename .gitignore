@@ -1,0 +1,70 @@
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+.vercel/
+.turbo/
+
+# Package manager caches
+.npm/
+.pnpm-store/
+.yarn/
+.cache/
+
+# Logs and diagnostics
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Coverage directories
+coverage/
+*.lcov
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# TypeScript metadata
+*.tsbuildinfo
+
+# Editor directories and files
+.vscode/
+.idea/
+.history/
+
+# Local environment variables
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
+
+# Misc configuration overrides
+*.local
+
+# OS generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.swp
+*.swo
+*.tmp
+*.temp
+
+# Archived packages
+*.tgz

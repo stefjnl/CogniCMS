@@ -1,0 +1,14 @@
+[
+  {
+    "id": "133faabc-e6cb-44b4-9fe8-c2bb51059d6b",
+    "name": "Zincafe Zweeloo",
+    "githubOwner": "stefjnl",
+    "githubRepo": "zincafe-zweeloo",
+    "githubBranch": "main",
+    "contentFile": "contents/content.json",
+    "htmlFile": "index.html",
+    "createdAt": "2025-10-31T18:55:38.663Z",
+    "lastModified": "2025-10-31T18:55:38.663Z",
+    "encryptedToken": "KjhuAEEyxptLHRoTCjoP+FZdnNvt1wIAXCYZ9OOzx57YgVZW/AEGMuQWx55MJu9qxvYG5IhcEmTXp79qECLDNhX7C6c="
+  }
+]
