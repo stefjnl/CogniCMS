@@ -297,41 +297,12 @@ export function ChatInterface({
         <SiteHeader site={site} lastSynced={lastModified} />
       </div>
 
-      {/* Two-row layout: Top row (50%) and Bottom row (50%) */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Top Row: Chat + Content Tree */}
-        <div className="flex h-1/2 flex-col gap-6 border-b-2 border-slate-200 p-6 lg:flex-row">
-          {/* Left Column: Chat Panel (40%) */}
-          <div className="flex flex-1 flex-col space-y-4 lg:w-2/5">
-            <div className="flex-1 overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-              <MessageList
-                messages={visibleMessages}
-                changes={previewChanges}
-                lastAssistantMessageId={lastAppliedAssistantId}
-              />
-            </div>
-
-            <MessageInput
-              onSend={handleSend}
-              disabled={isChatStreaming || publishState === "publishing"}
-            />
-
-            {showSpinner && (
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <LoadingSpinner />
-                <span>AI is thinking...</span>
-              </div>
-            )}
-
-            {clientError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-                <p className="text-sm text-red-700">{clientError}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Right Column: Content Overview + Preview Panel (60%) */}
-          <div className="flex flex-1 flex-col space-y-4 overflow-y-auto lg:w-3/5">
+      {/* Main layout: Left column (2 rows) + Right column (site preview) */}
+      <div className="flex flex-1 gap-6 overflow-hidden p-6">
+        {/* Left Column: Top = Content Overview, Bottom = AI Chat */}
+        <div className="flex w-2/5 flex-col gap-6">
+          {/* Top Left: Content Overview + Preview Panel */}
+          <div className="flex h-1/2 flex-col space-y-4 overflow-y-auto">
             <ContentOverview content={draftContent} />
 
             <PreviewPanel
@@ -359,10 +330,39 @@ export function ChatInterface({
               changeCount={previewChanges.length}
             />
           </div>
+
+          {/* Bottom Left: AI Chat Panel */}
+          <div className="flex h-1/2 flex-col space-y-4">
+            <div className="flex-1 overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <MessageList
+                messages={visibleMessages}
+                changes={previewChanges}
+                lastAssistantMessageId={lastAppliedAssistantId}
+              />
+            </div>
+
+            <MessageInput
+              onSend={handleSend}
+              disabled={isChatStreaming || publishState === "publishing"}
+            />
+
+            {showSpinner && (
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <LoadingSpinner />
+                <span>AI is thinking...</span>
+              </div>
+            )}
+
+            {clientError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                <p className="text-sm text-red-700">{clientError}</p>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Bottom Row: Site Preview (50%) */}
-        <div className="h-1/2 overflow-y-auto">
+        {/* Right Column: Site Preview */}
+        <div className="w-3/5 overflow-y-auto">
           <SitePreview
             siteId={site.id}
             currentHTML={previewHTML}
