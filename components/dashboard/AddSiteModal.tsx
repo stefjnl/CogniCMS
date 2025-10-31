@@ -1,10 +1,11 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useState } from "react";
-import { Modal } from "@/components/ui/Modal";
+import { Modal } from "@/components/ui/Dialog";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { Label } from "@/components/ui/Label";
 
 interface AddSiteModalProps {
   open: boolean;
@@ -65,21 +66,18 @@ export function AddSiteModal({ open, onClose, onCreated }: AddSiteModalProps) {
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onOpenChange={onClose}
       title="Add Website"
-      description="Connect a GitHub Pages repository."
+      description="Connect a GitHub repository to manage your static site."
+      size="lg"
     >
-      <form className="space-y-4" onSubmit={handleSubmit}>
+      <form className="space-y-6" onSubmit={handleSubmit}>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="site-name"
-            >
-              Site name
-            </label>
+            <Label htmlFor="site-name">Site Name</Label>
             <Input
               id="site-name"
+              placeholder="My Website"
               value={form.name}
               onChange={(event: ChangeEvent<HTMLInputElement>) =>
                 updateField("name", event.target.value)
@@ -88,14 +86,10 @@ export function AddSiteModal({ open, onClose, onCreated }: AddSiteModalProps) {
             />
           </div>
           <div className="space-y-2">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="site-owner"
-            >
-              GitHub owner
-            </label>
+            <Label htmlFor="site-owner">GitHub Owner</Label>
             <Input
               id="site-owner"
+              placeholder="username or organization"
               value={form.githubOwner}
               onChange={(event: ChangeEvent<HTMLInputElement>) =>
                 updateField("githubOwner", event.target.value)
@@ -104,14 +98,10 @@ export function AddSiteModal({ open, onClose, onCreated }: AddSiteModalProps) {
             />
           </div>
           <div className="space-y-2">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="site-repo"
-            >
-              Repository
-            </label>
+            <Label htmlFor="site-repo">Repository</Label>
             <Input
               id="site-repo"
+              placeholder="repository-name"
               value={form.githubRepo}
               onChange={(event: ChangeEvent<HTMLInputElement>) =>
                 updateField("githubRepo", event.target.value)
@@ -120,14 +110,10 @@ export function AddSiteModal({ open, onClose, onCreated }: AddSiteModalProps) {
             />
           </div>
           <div className="space-y-2">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="site-branch"
-            >
-              Branch
-            </label>
+            <Label htmlFor="site-branch">Branch</Label>
             <Input
               id="site-branch"
+              placeholder="main"
               value={form.githubBranch}
               onChange={(event: ChangeEvent<HTMLInputElement>) =>
                 updateField("githubBranch", event.target.value)
@@ -135,14 +121,10 @@ export function AddSiteModal({ open, onClose, onCreated }: AddSiteModalProps) {
             />
           </div>
           <div className="space-y-2">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="content-file"
-            >
-              Content file path
-            </label>
+            <Label htmlFor="content-file">Content File Path</Label>
             <Input
               id="content-file"
+              placeholder="content.json"
               value={form.contentFile}
               onChange={(event: ChangeEvent<HTMLInputElement>) =>
                 updateField("contentFile", event.target.value)
@@ -150,14 +132,10 @@ export function AddSiteModal({ open, onClose, onCreated }: AddSiteModalProps) {
             />
           </div>
           <div className="space-y-2">
-            <label
-              className="text-sm font-medium text-slate-700"
-              htmlFor="html-file"
-            >
-              HTML file path
-            </label>
+            <Label htmlFor="html-file">HTML File Path</Label>
             <Input
               id="html-file"
+              placeholder="index.html"
               value={form.htmlFile}
               onChange={(event: ChangeEvent<HTMLInputElement>) =>
                 updateField("htmlFile", event.target.value)
@@ -167,40 +145,35 @@ export function AddSiteModal({ open, onClose, onCreated }: AddSiteModalProps) {
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-700" htmlFor="token">
-            GitHub Personal Access Token
-          </label>
+          <Label htmlFor="token">GitHub Personal Access Token</Label>
           <Input
             id="token"
             type="password"
+            placeholder="ghp_..."
             value={form.githubToken}
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
               updateField("githubToken", event.target.value)
             }
-            placeholder="ghp_..."
             required
           />
-          <p className="text-xs text-slate-500">
-            Token requires <span className="font-semibold">repo</span> scope.
-            Stored encrypted.
+          <p className="text-xs text-muted-foreground">
+            Token requires <span className="font-semibold">repo</span> scope and
+            is stored encrypted.
           </p>
         </div>
 
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error && (
+          <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
+          </div>
+        )}
 
-        <div className="flex items-center justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={onClose}>
+        <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+          <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={loading}>
-            {loading ? (
-              <span className="flex items-center gap-2">
-                <LoadingSpinner />
-                Saving...
-              </span>
-            ) : (
-              "Save"
-            )}
+          <Button type="submit" disabled={loading} loading={loading}>
+            {loading ? "Creating..." : "Create Site"}
           </Button>
         </div>
       </form>

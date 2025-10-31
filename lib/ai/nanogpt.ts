@@ -37,7 +37,7 @@ export async function createNanoGptRequest(
       "X-Trace-Id": traceId,
     },
     body: JSON.stringify({
-      model: "openai/gpt-oss-120b",
+      model: "z-ai/glm-4.6",
       stream: true,
       messages: messages.map(({ role, content }) => ({ role, content })),
     }),
