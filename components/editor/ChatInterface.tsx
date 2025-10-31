@@ -334,7 +334,10 @@ export function ChatInterface({
           <div className="flex flex-1 flex-col space-y-4 overflow-y-auto lg:w-3/5">
             <ContentOverview content={draftContent} />
 
-            <PreviewPanel draftContent={draftContent} changes={previewChanges} />
+            <PreviewPanel
+              draftContent={draftContent}
+              changes={previewChanges}
+            />
 
             <PublishingStatus
               state={publishState}

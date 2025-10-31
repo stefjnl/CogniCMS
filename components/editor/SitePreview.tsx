@@ -68,7 +68,8 @@ export function SitePreview({
           <h3 className="text-sm font-semibold text-slate-700">Site Preview</h3>
           {changeCount > 0 && (
             <span className="rounded bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">
-              🟡 {changeCount} {changeCount === 1 ? "change" : "changes"} pending
+              🟡 {changeCount} {changeCount === 1 ? "change" : "changes"}{" "}
+              pending
             </span>
           )}
           {isPublishing && (

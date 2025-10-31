@@ -34,7 +34,7 @@ export async function POST(
   try {
     // Apply changes to HTML
     const updatedHTML = applyChangesToHTML(currentHTML, changes);
-    
+
     // Add highlights to changed elements
     const highlightedHTML = addChangeHighlights(updatedHTML, changes);
 

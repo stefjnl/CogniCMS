@@ -19,7 +19,7 @@ export function applyChangesToHTML(
     try {
       const selector = getSelectorForChange(change);
       const element = document.querySelector(selector);
-      
+
       if (!element) {
         console.warn(`Element not found for selector: ${selector}`);
         continue;
@@ -95,10 +95,13 @@ export function addChangeHighlights(
     try {
       const selector = getSelectorForChange(change);
       const element = document.querySelector(selector);
-      
+
       if (element) {
         element.classList.add("cognicms-changed");
-        element.setAttribute("data-cognicms-change-id", `${change.sectionId}-${change.field}`);
+        element.setAttribute(
+          "data-cognicms-change-id",
+          `${change.sectionId}-${change.field}`
+        );
       }
     } catch (error) {
       console.error(`Failed to highlight change:`, change, error);
@@ -146,10 +149,10 @@ function applyChangeToElement(element: Element, change: PreviewChange): void {
       if (!Array.isArray(items)) return;
       const list = lists[index];
       if (!list) return;
-      
+
       // Clear existing items
-      Array.from(list.children).forEach(child => child.remove());
-      
+      Array.from(list.children).forEach((child) => child.remove());
+
       // Add new items
       items.forEach((item: unknown) => {
         if (typeof item === "string") {
@@ -167,7 +170,7 @@ function applyChangeToElement(element: Element, change: PreviewChange): void {
       if (!link || typeof link !== "object") return;
       const anchor = anchors[index];
       if (!anchor) return;
-      
+
       const { text, href } = link as { text?: string; href?: string };
       if (text) anchor.textContent = text;
       if (href) anchor.setAttribute("href", href);
