@@ -16,47 +16,53 @@ export function PreviewPanel({ draftContent, changes }: PreviewPanelProps) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Proposed Changes
-        </h3>
-        {changes.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-600">No changes detected.</p>
-        ) : (
-          <ul className="mt-3 space-y-3 text-sm text-slate-700">
-            {changes.map((change) => (
-              <li
-                key={`${change.sectionId}-${change.field}`}
-                className="rounded-md bg-slate-50 p-3"
-              >
-                <p className="font-medium text-slate-900">
-                  {change.sectionLabel}
-                </p>
-                <p className="text-xs uppercase tracking-wide text-slate-500">
-                  {change.field}
-                </p>
-                <div className="mt-2 grid gap-2 text-xs">
-                  <div>
-                    <span className="font-semibold text-slate-500">
-                      Current:
-                    </span>
-                    <pre className="mt-1 whitespace-pre-wrap rounded bg-slate-100 p-2 text-slate-700">
-                      {JSON.stringify(change.currentValue, null, 2)}
-                    </pre>
+      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">
+            Proposed Changes
+          </h3>
+        </div>
+        
+        <div className="p-4">
+          {changes.length === 0 ? (
+            <p className="text-center text-sm text-slate-500">No changes detected.</p>
+          ) : (
+            <div className="space-y-3">
+              {changes.map((change, idx) => (
+                <div
+                  key={`${change.sectionId}-${change.field}-${idx}`}
+                  className="rounded-md border border-slate-200 bg-slate-50 p-3"
+                >
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="text-lg">✏️</span>
+                    <div className="flex-1">
+                      <p className="font-medium text-slate-900">{change.sectionLabel}</p>
+                      <p className="text-xs text-slate-500">{change.field}</p>
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-semibold text-brand-600">
-                      Proposed:
-                    </span>
-                    <pre className="mt-1 whitespace-pre-wrap rounded bg-brand-50 p-2 text-slate-900">
-                      {JSON.stringify(change.proposedValue, null, 2)}
-                    </pre>
+                  <div className="space-y-2 text-xs">
+                    <div className="rounded bg-white p-2">
+                      <span className="font-semibold text-red-600">- </span>
+                      <span className="text-slate-700">
+                        {typeof change.currentValue === "string"
+                          ? change.currentValue
+                          : JSON.stringify(change.currentValue)}
+                      </span>
+                    </div>
+                    <div className="rounded bg-white p-2">
+                      <span className="font-semibold text-green-600">+ </span>
+                      <span className="text-slate-900">
+                        {typeof change.proposedValue === "string"
+                          ? change.proposedValue
+                          : JSON.stringify(change.proposedValue)}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </li>
-            ))}
-          </ul>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

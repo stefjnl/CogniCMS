@@ -1,49 +1,41 @@
 "use client";
 
-import { ChangeEvent } from "react";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 
 interface ApprovalButtonsProps {
-  commitMessage: string;
-  onCommitMessageChange: (value: string) => void;
   onPublish: () => Promise<void>;
   onReset: () => void;
   disabled?: boolean;
+  changeCount: number;
 }
 
 export function ApprovalButtons({
-  commitMessage,
-  onCommitMessageChange,
   onPublish,
   onReset,
   disabled,
+  changeCount,
 }: ApprovalButtonsProps) {
+  if (changeCount === 0) {
+    return null;
+  }
+
   return (
-    <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="space-y-2">
-        <label
-          className="text-sm font-medium text-slate-700"
-          htmlFor="commit-message"
-        >
-          Commit message
-        </label>
-        <Input
-          id="commit-message"
-          value={commitMessage}
-          onChange={(event: ChangeEvent<HTMLInputElement>) =>
-            onCommitMessageChange(event.target.value)
-          }
-          placeholder="[CogniCMS] Update content"
-        />
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={onPublish} disabled={disabled}>
-          Approve &amp; Publish
-        </Button>
-        <Button variant="secondary" onClick={onReset} disabled={disabled}>
-          Reset Draft
-        </Button>
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-slate-900">
+            {changeCount} {changeCount === 1 ? "change" : "changes"} ready
+          </p>
+          <p className="text-xs text-slate-600">Review changes before publishing</p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={onPublish} disabled={disabled}>
+            Publish to Live Site
+          </Button>
+          <Button variant="secondary" onClick={onReset} disabled={disabled}>
+            Discard All Changes
+          </Button>
+        </div>
       </div>
     </div>
   );

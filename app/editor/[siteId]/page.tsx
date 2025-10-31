@@ -28,12 +28,14 @@ export default async function EditorPage({ params }: EditorPageProps) {
   const content = JSON.parse(contentFile.content) as WebsiteContent;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 py-10">
-      <ChatInterface
-        site={site}
-        initialContent={content}
-        lastModified={site.lastModified}
-      />
+    <div className="min-h-screen bg-slate-50">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <ChatInterface
+          site={site}
+          initialContent={content}
+          lastModified={site.lastModified}
+        />
+      </div>
     </div>
   );
 }

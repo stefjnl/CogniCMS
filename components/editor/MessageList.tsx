@@ -1,5 +1,7 @@
 import React from "react";
 import type { UIMessage } from "ai";
+import { PreviewChange } from "@/types/content";
+import { ChangeCard } from "./ChangeCard";
 
 function formatToolOutput(output: unknown): string {
   if (!output) return "";
@@ -80,10 +82,41 @@ function extractMessageContent(message: UIMessage): string {
   return segments.join("\n\n");
 }
 
-export function MessageList({ messages }: { messages: UIMessage[] }) {
+interface MessageListProps {
+  messages: UIMessage[];
+  changes?: PreviewChange[];
+  lastAssistantMessageId?: string | null;
+}
+
+export function MessageList({ messages, changes = [], lastAssistantMessageId }: MessageListProps) {
+  // Empty state when no messages
+  if (messages.length === 0) {
+    return (
+      <div className="py-12 text-center">
+        <div className="mx-auto max-w-md space-y-4">
+          <div className="text-4xl">👋</div>
+          <h3 className="text-lg font-semibold text-slate-900">Welcome to CogniCMS</h3>
+          <p className="text-sm text-slate-600">Try asking:</p>
+          <ul className="space-y-2 text-left text-sm text-slate-700">
+            <li className="rounded bg-slate-50 px-4 py-2">
+              • "Change the meeting date to December 10, 2025"
+            </li>
+            <li className="rounded bg-slate-50 px-4 py-2">
+              • "Update the email address"
+            </li>
+            <li className="rounded bg-slate-50 px-4 py-2">
+              • "Add a new FAQ item"
+            </li>
+          </ul>
+          <p className="text-xs text-slate-500">I can edit any text on your site!</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
-      {messages.map((message) => {
+      {messages.map((message, index) => {
         const content = extractMessageContent(message);
         const role = message.role === "user" ? "user" : "assistant";
 
@@ -91,24 +124,36 @@ export function MessageList({ messages }: { messages: UIMessage[] }) {
           return null;
         }
 
+        const isLastAssistant = role === "assistant" && message.id === lastAssistantMessageId;
+        const showChanges = isLastAssistant && changes.length > 0;
+
         return (
-          <div
-            key={message.id}
-            className={`flex ${
-              role === "user" ? "justify-end" : "justify-start"
-            }`}
-          >
+          <div key={message.id} className="space-y-3">
             <div
-              className={`max-w-xl rounded-lg px-4 py-3 text-sm shadow-sm ${
-                role === "user"
-                  ? "bg-brand-600 text-white"
-                  : "bg-white text-slate-900"
+              className={`flex ${
+                role === "user" ? "justify-end" : "justify-start"
               }`}
             >
-              <pre className="whitespace-pre-wrap break-words font-sans text-sm">
-                {content}
-              </pre>
+              <div
+                className={`max-w-xl rounded-lg px-4 py-3 text-sm shadow-sm ${
+                  role === "user"
+                    ? "bg-blue-600 text-white"
+                    : "bg-slate-100 text-slate-900 border border-slate-200"
+                }`}
+              >
+                <pre className="whitespace-pre-wrap break-words font-sans text-sm">
+                  {content}
+                </pre>
+              </div>
             </div>
+
+            {showChanges && (
+              <div className="ml-8 space-y-2">
+                {changes.map((change, idx) => (
+                  <ChangeCard key={`${change.sectionId}-${change.field}-${idx}`} change={change} compact />
+                ))}
+              </div>
+            )}
           </div>
         );
       })}

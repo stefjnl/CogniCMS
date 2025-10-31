@@ -8,8 +8,10 @@ import { WebsiteContent, PreviewChange } from "@/types/content";
 import { MessageList } from "@/components/editor/MessageList";
 import { MessageInput } from "@/components/editor/MessageInput";
 import { PreviewPanel } from "@/components/editor/PreviewPanel";
+import { ContentOverview } from "@/components/editor/ContentOverview";
 import { SiteHeader } from "@/components/editor/SiteHeader";
 import { ApprovalButtons } from "@/components/editor/ApprovalButtons";
+import { PublishingStatus } from "@/components/editor/PublishingStatus";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { diffWebsiteContent } from "@/lib/content/differ";
 import { buildCommitMessage } from "@/lib/utils/commit";
@@ -51,9 +53,11 @@ export function ChatInterface({
   const [commitMessage, setCommitMessage] = useState(
     "[CogniCMS] Content update"
   );
+  const [publishState, setPublishState] = useState<
+    "idle" | "pending" | "publishing" | "published" | "error"
+  >("idle");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
-  const [isPublishing, setIsPublishing] = useState(false);
   const [lastAppliedAssistantId, setLastAppliedAssistantId] = useState<
     string | null
   >(null);
@@ -110,6 +114,9 @@ export function ChatInterface({
       if (payloadExplanation) {
         setStatusMessage(payloadExplanation);
       }
+      if (changes.length > 0) {
+        setPublishState("pending");
+      }
     },
     [diffAgainstBaseline, site.id]
   );
@@ -119,6 +126,7 @@ export function ChatInterface({
       try {
         setClientError(null);
         setStatusMessage(null);
+        setPublishState("idle");
         clearError?.();
         await sendMessage(
           { text: message },
@@ -139,6 +147,7 @@ export function ChatInterface({
     setDraftContent(baselineRef.current);
     setPreviewChanges([]);
     setCommitMessage("[CogniCMS] Content update");
+    setPublishState("idle");
     await fetch(`/api/content/${site.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -148,7 +157,7 @@ export function ChatInterface({
 
   const handlePublish = useCallback(async () => {
     if (!draftContent) return;
-    setIsPublishing(true);
+    setPublishState("publishing");
     setClientError(null);
     setStatusMessage(null);
 
@@ -169,17 +178,23 @@ export function ChatInterface({
 
       baselineRef.current = draftContent;
       setPreviewChanges([]);
+      setPublishState("published");
       setStatusMessage(payload.message ?? "Changes published successfully.");
+      
+      // Reset to idle after 5 seconds
+      setTimeout(() => {
+        setPublishState("idle");
+        setStatusMessage(null);
+      }, 5000);
     } catch (err) {
       setClientError((err as Error).message);
-    } finally {
-      setIsPublishing(false);
+      setPublishState("error");
     }
   }, [commitMessage, draftContent, site.id]);
 
   const disablePublish = useMemo(
-    () => isPublishing || isChatStreaming || previewChanges.length === 0,
-    [isPublishing, isChatStreaming, previewChanges.length]
+    () => publishState === "publishing" || isChatStreaming || previewChanges.length === 0,
+    [publishState, isChatStreaming, previewChanges.length]
   );
 
   useEffect(() => {
@@ -224,43 +239,62 @@ export function ChatInterface({
     [uiMessages]
   );
 
-  const showSpinner = isChatStreaming || isPublishing;
+  const showSpinner = isChatStreaming;
 
   return (
     <div className="space-y-6">
       <SiteHeader site={site} lastSynced={lastModified} />
 
-      <div className="grid gap-6 lg:grid-cols-[1.5fr,1fr]">
-        <div className="space-y-4">
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <MessageList messages={visibleMessages} />
+      {/* Two-column layout: 40% chat, 60% preview on desktop; stacked on mobile */}
+      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[2fr,3fr]">
+        {/* Left Column: Chat Panel */}
+        <div className="flex flex-col space-y-4">
+          <div className="h-96 overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:h-auto" style={{ maxHeight: 'calc(100vh - 20rem)' }}>
+            <MessageList 
+              messages={visibleMessages} 
+              changes={previewChanges}
+              lastAssistantMessageId={lastAppliedAssistantId}
+            />
           </div>
+          
           <MessageInput
             onSend={handleSend}
-            disabled={isChatStreaming || isPublishing}
+            disabled={isChatStreaming || publishState === "publishing"}
           />
-          {showSpinner ? (
+          
+          {showSpinner && (
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <LoadingSpinner />
-              {isPublishing ? "Publishing changes..." : "Applying changes..."}
+              <span>AI is thinking...</span>
             </div>
-          ) : null}
-          {clientError ? (
-            <p className="text-sm text-red-600">{clientError}</p>
-          ) : null}
-          {statusMessage ? (
-            <p className="text-sm text-green-600">{statusMessage}</p>
-          ) : null}
+          )}
+          
+          {clientError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+              <p className="text-sm text-red-700">{clientError}</p>
+            </div>
+          )}
         </div>
 
+        {/* Right Column: Preview Panel */}
         <div className="space-y-4">
+          <ContentOverview content={draftContent} />
+          
           <PreviewPanel draftContent={draftContent} changes={previewChanges} />
+          
+          <PublishingStatus
+            state={publishState}
+            changeCount={previewChanges.length}
+            message={statusMessage || undefined}
+            onPublish={handlePublish}
+            onViewLive={() => window.open(`https://${site.githubOwner}.github.io/${site.githubRepo}/`, '_blank')}
+          />
+          
           <ApprovalButtons
-            commitMessage={commitMessage}
-            onCommitMessageChange={setCommitMessage}
             onPublish={handlePublish}
             onReset={handleReset}
             disabled={disablePublish}
+            changeCount={previewChanges.length}
           />
         </div>
       </div>

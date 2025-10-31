@@ -70,38 +70,67 @@ export function diffWebsiteContent(
 ): PreviewChange[] {
   const changes: PreviewChange[] = [];
 
+  // Validate inputs
+  if (!previous || !next) {
+    return changes;
+  }
+
   if (
-    toComparable(previous.metadata.title) !== toComparable(next.metadata.title)
+    toComparable(previous.metadata?.title) !== toComparable(next.metadata?.title)
   ) {
     changes.push({
       sectionId: "metadata",
       sectionLabel: "Metadata",
       field: "title",
       changeType: "update",
-      currentValue: previous.metadata.title,
-      proposedValue: next.metadata.title,
+      currentValue: previous.metadata?.title,
+      proposedValue: next.metadata?.title,
     });
   }
 
   if (
-    toComparable(previous.metadata.description) !==
-    toComparable(next.metadata.description)
+    toComparable(previous.metadata?.description) !==
+    toComparable(next.metadata?.description)
   ) {
     changes.push({
       sectionId: "metadata",
       sectionLabel: "Metadata",
       field: "description",
       changeType: "update",
-      currentValue: previous.metadata.description,
-      proposedValue: next.metadata.description,
+      currentValue: previous.metadata?.description,
+      proposedValue: next.metadata?.description,
     });
   }
 
+  // Validate sections array exists
+  if (!previous.sections || !next.sections) {
+    return changes;
+  }
+
+  // Handle both array and object formats for sections
+  const previousSectionsArray = Array.isArray(previous.sections)
+    ? previous.sections
+    : Object.entries(previous.sections).map(([id, section]: [string, any]) => ({
+        id,
+        label: section.label || id,
+        type: section.type || 'content',
+        content: section.content || section,
+      }));
+
+  const nextSectionsArray = Array.isArray(next.sections)
+    ? next.sections
+    : Object.entries(next.sections).map(([id, section]: [string, any]) => ({
+        id,
+        label: section.label || id,
+        type: section.type || 'content',
+        content: section.content || section,
+      }));
+
   const previousSections = new Map(
-    previous.sections.map((section: WebsiteSection) => [section.id, section])
+    previousSectionsArray.map((section: WebsiteSection) => [section.id, section])
   );
   const nextSections = new Map(
-    next.sections.map((section: WebsiteSection) => [section.id, section])
+    nextSectionsArray.map((section: WebsiteSection) => [section.id, section])
   );
   const sectionIds = new Set([
     ...previousSections.keys(),
