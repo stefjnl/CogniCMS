@@ -12,6 +12,7 @@ import { ContentOverview } from "@/components/editor/ContentOverview";
 import { SiteHeader } from "@/components/editor/SiteHeader";
 import { ApprovalButtons } from "@/components/editor/ApprovalButtons";
 import { PublishingStatus } from "@/components/editor/PublishingStatus";
+import { SitePreview } from "@/components/editor/SitePreview";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { diffWebsiteContent } from "@/lib/content/differ";
 import { buildCommitMessage } from "@/lib/utils/commit";
@@ -19,6 +20,7 @@ import { buildCommitMessage } from "@/lib/utils/commit";
 interface ChatInterfaceProps {
   site: SiteConfig;
   initialContent: WebsiteContent;
+  initialHTML: string;
   lastModified: string;
 }
 
@@ -44,11 +46,14 @@ function parseJsonPlan(
 export function ChatInterface({
   site,
   initialContent,
+  initialHTML,
   lastModified,
 }: ChatInterfaceProps) {
   const [draftContent, setDraftContent] = useState<WebsiteContent | null>(
     initialContent
   );
+  const [currentHTML, setCurrentHTML] = useState<string>(initialHTML);
+  const [previewHTML, setPreviewHTML] = useState<string>(initialHTML);
   const [previewChanges, setPreviewChanges] = useState<PreviewChange[]>([]);
   const [commitMessage, setCommitMessage] = useState(
     "[CogniCMS] Content update"
@@ -89,6 +94,39 @@ export function ChatInterface({
 
   const isChatStreaming =
     chatStatus === "submitted" || chatStatus === "streaming";
+
+  // Update preview HTML when changes occur
+  useEffect(() => {
+    const updatePreview = async () => {
+      if (previewChanges.length > 0) {
+        try {
+          const response = await fetch(`/api/preview/${site.id}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              currentHTML,
+              changes: previewChanges,
+            }),
+          });
+
+          if (response.ok) {
+            const { html } = await response.json();
+            setPreviewHTML(html);
+          } else {
+            console.error("Failed to generate preview");
+            setPreviewHTML(currentHTML);
+          }
+        } catch (error) {
+          console.error("Preview update failed:", error);
+          setPreviewHTML(currentHTML);
+        }
+      } else {
+        setPreviewHTML(currentHTML);
+      }
+    };
+
+    updatePreview();
+  }, [currentHTML, previewChanges, site.id]);
 
   const diffAgainstBaseline = useCallback(
     (nextContent: WebsiteContent) =>
@@ -167,6 +205,7 @@ export function ChatInterface({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content: draftContent,
+          html: currentHTML, // Base HTML for regeneration
           commitMessage,
         }),
       });
@@ -174,6 +213,14 @@ export function ChatInterface({
       const payload = await response.json();
       if (!response.ok) {
         throw new Error(payload.error ?? "Failed to publish changes");
+      }
+
+      // After successful publish, fetch the updated HTML
+      const htmlResponse = await fetch(`/api/content/${site.id}/html`);
+      if (htmlResponse.ok) {
+        const { html } = await htmlResponse.json();
+        setCurrentHTML(html);
+        setPreviewHTML(html);
       }
 
       baselineRef.current = draftContent;
@@ -190,7 +237,7 @@ export function ChatInterface({
       setClientError((err as Error).message);
       setPublishState("error");
     }
-  }, [commitMessage, draftContent, site.id]);
+  }, [commitMessage, currentHTML, draftContent, site.id]);
 
   const disablePublish = useMemo(
     () =>
@@ -245,67 +292,81 @@ export function ChatInterface({
   const showSpinner = isChatStreaming;
 
   return (
-    <div className="space-y-6">
-      <SiteHeader site={site} lastSynced={lastModified} />
+    <div className="flex h-screen flex-col">
+      <div className="flex-shrink-0 p-6">
+        <SiteHeader site={site} lastSynced={lastModified} />
+      </div>
 
-      {/* Two-column layout: 40% chat, 60% preview on desktop; stacked on mobile */}
-      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[2fr,3fr]">
-        {/* Left Column: Chat Panel */}
-        <div className="flex flex-col space-y-4">
-          <div
-            className="h-96 overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:h-auto"
-            style={{ maxHeight: "calc(100vh - 20rem)" }}
-          >
-            <MessageList
-              messages={visibleMessages}
-              changes={previewChanges}
-              lastAssistantMessageId={lastAppliedAssistantId}
+      {/* Two-row layout: Top row (50%) and Bottom row (50%) */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Top Row: Chat + Content Tree */}
+        <div className="flex h-1/2 flex-col gap-6 border-b-2 border-slate-200 p-6 lg:flex-row">
+          {/* Left Column: Chat Panel (40%) */}
+          <div className="flex flex-1 flex-col space-y-4 lg:w-2/5">
+            <div className="flex-1 overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <MessageList
+                messages={visibleMessages}
+                changes={previewChanges}
+                lastAssistantMessageId={lastAppliedAssistantId}
+              />
+            </div>
+
+            <MessageInput
+              onSend={handleSend}
+              disabled={isChatStreaming || publishState === "publishing"}
             />
+
+            {showSpinner && (
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <LoadingSpinner />
+                <span>AI is thinking...</span>
+              </div>
+            )}
+
+            {clientError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                <p className="text-sm text-red-700">{clientError}</p>
+              </div>
+            )}
           </div>
 
-          <MessageInput
-            onSend={handleSend}
-            disabled={isChatStreaming || publishState === "publishing"}
-          />
+          {/* Right Column: Content Overview + Preview Panel (60%) */}
+          <div className="flex flex-1 flex-col space-y-4 overflow-y-auto lg:w-3/5">
+            <ContentOverview content={draftContent} />
 
-          {showSpinner && (
-            <div className="flex items-center gap-2 text-sm text-slate-600">
-              <LoadingSpinner />
-              <span>AI is thinking...</span>
-            </div>
-          )}
+            <PreviewPanel draftContent={draftContent} changes={previewChanges} />
 
-          {clientError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-              <p className="text-sm text-red-700">{clientError}</p>
-            </div>
-          )}
+            <PublishingStatus
+              state={publishState}
+              changeCount={previewChanges.length}
+              message={statusMessage || undefined}
+              onPublish={handlePublish}
+              onViewLive={() =>
+                window.open(
+                  `https://${site.githubOwner}.github.io/${site.githubRepo}/`,
+                  "_blank"
+                )
+              }
+            />
+
+            <ApprovalButtons
+              onPublish={handlePublish}
+              onReset={handleReset}
+              disabled={disablePublish}
+              changeCount={previewChanges.length}
+            />
+          </div>
         </div>
 
-        {/* Right Column: Preview Panel */}
-        <div className="space-y-4">
-          <ContentOverview content={draftContent} />
-
-          <PreviewPanel draftContent={draftContent} changes={previewChanges} />
-
-          <PublishingStatus
-            state={publishState}
-            changeCount={previewChanges.length}
-            message={statusMessage || undefined}
-            onPublish={handlePublish}
-            onViewLive={() =>
-              window.open(
-                `https://${site.githubOwner}.github.io/${site.githubRepo}/`,
-                "_blank"
-              )
-            }
-          />
-
-          <ApprovalButtons
-            onPublish={handlePublish}
-            onReset={handleReset}
-            disabled={disablePublish}
-            changeCount={previewChanges.length}
+        {/* Bottom Row: Site Preview (50%) */}
+        <div className="h-1/2 overflow-y-auto">
+          <SitePreview
+            siteId={site.id}
+            currentHTML={previewHTML}
+            proposedChanges={previewChanges}
+            onApprove={handlePublish}
+            onDiscard={handleReset}
+            isPublishing={publishState === "publishing"}
           />
         </div>
       </div>

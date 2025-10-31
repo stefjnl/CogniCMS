@@ -27,15 +27,18 @@ export default async function EditorPage({ params }: EditorPageProps) {
   const contentFile = await getFileContent(site, site.contentFile);
   const content = JSON.parse(contentFile.content) as WebsiteContent;
 
+  // Fetch the current HTML file
+  const htmlFile = await getFileContent(site, site.htmlFile);
+  const currentHTML = htmlFile.content;
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <ChatInterface
-          site={site}
-          initialContent={content}
-          lastModified={site.lastModified}
-        />
-      </div>
+    <div className="h-screen overflow-hidden bg-slate-50">
+      <ChatInterface
+        site={site}
+        initialContent={content}
+        initialHTML={currentHTML}
+        lastModified={site.lastModified}
+      />
     </div>
   );
 }
