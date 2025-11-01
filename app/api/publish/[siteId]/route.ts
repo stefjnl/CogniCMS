@@ -15,6 +15,7 @@ import { generateHtmlFromContent } from "@/lib/content/generator";
 import { requireSession } from "@/lib/utils/auth";
 import { publishSchema } from "@/lib/utils/validation";
 import { WebsiteContent } from "@/types/content";
+import { JSDOM } from 'jsdom';
 
 function authError() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -123,7 +124,6 @@ export async function POST(
       // The highlighted HTML is only for preview, not for publishing
       if (hasChangeHighlights) {
         console.log("[PUBLISH_API] Stripping change highlights before publishing...");
-        const { JSDOM } = await import('jsdom');
         const dom = new JSDOM(finalHtml);
         const { document } = dom.window;
         
