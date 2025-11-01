@@ -32,7 +32,7 @@ export async function createSessionResponse(): Promise<NextResponse> {
     name: SESSION_COOKIE,
     value: token,
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
     path: "/",
     sameSite: "lax",
     maxAge: SESSION_DURATION_HOURS * 60 * 60,
@@ -47,7 +47,7 @@ export function destroySessionResponse(): NextResponse {
     name: SESSION_COOKIE,
     value: "",
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 0,
   });

@@ -1,11 +1,20 @@
 import { PreviewChange, WebsiteContent } from "@/types/content";
+import { Button } from "@/components/ui/Button";
+import { ChangeCard } from "./ChangeCard";
 
 interface PreviewPanelProps {
   draftContent: WebsiteContent | null;
   changes: PreviewChange[];
+  onDiscardChange?: (sectionId: string, field: string) => void;
+  onDiscardAll?: () => void;
 }
 
-export function PreviewPanel({ draftContent, changes }: PreviewPanelProps) {
+export function PreviewPanel({
+  draftContent,
+  changes,
+  onDiscardChange,
+  onDiscardAll,
+}: PreviewPanelProps) {
   if (!draftContent) {
     return (
       <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600">
@@ -14,13 +23,42 @@ export function PreviewPanel({ draftContent, changes }: PreviewPanelProps) {
     );
   }
 
+  // Group changes by source
+  const manualChanges = changes.filter((c) => c.source === "manual");
+  const aiChanges = changes.filter((c) => c.source === "ai");
+  const unknownChanges = changes.filter((c) => !c.source);
+
+  const handleDiscardAll = () => {
+    if (
+      window.confirm(
+        `Are you sure you want to discard all ${changes.length} changes?`
+      )
+    ) {
+      onDiscardAll?.();
+    }
+  };
+
+  const handleDiscardChange = (change: PreviewChange) => {
+    onDiscardChange?.(change.sectionId, change.field);
+  };
+
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 flex items-center justify-between">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">
-            Proposed Changes
+            Proposed Changes ({changes.length})
           </h3>
+          {changes.length > 0 && onDiscardAll && (
+            <Button
+              variant="secondary"
+              size="xs"
+              onClick={handleDiscardAll}
+              className="text-xs"
+            >
+              Discard All
+            </Button>
+          )}
         </div>
 
         <div className="p-4">
@@ -29,41 +67,64 @@ export function PreviewPanel({ draftContent, changes }: PreviewPanelProps) {
               No changes detected.
             </p>
           ) : (
-            <div className="space-y-3">
-              {changes.map((change, idx) => (
-                <div
-                  key={`${change.sectionId}-${change.field}-${idx}`}
-                  className="rounded-md border border-slate-200 bg-slate-50 p-3"
-                >
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="text-lg">✏️</span>
-                    <div className="flex-1">
-                      <p className="font-medium text-slate-900">
-                        {change.sectionLabel}
-                      </p>
-                      <p className="text-xs text-slate-500">{change.field}</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2 text-xs">
-                    <div className="rounded bg-white p-2">
-                      <span className="font-semibold text-red-600">- </span>
-                      <span className="text-slate-700">
-                        {typeof change.currentValue === "string"
-                          ? change.currentValue
-                          : JSON.stringify(change.currentValue)}
-                      </span>
-                    </div>
-                    <div className="rounded bg-white p-2">
-                      <span className="font-semibold text-green-600">+ </span>
-                      <span className="text-slate-900">
-                        {typeof change.proposedValue === "string"
-                          ? change.proposedValue
-                          : JSON.stringify(change.proposedValue)}
-                      </span>
-                    </div>
+            <div className="space-y-4">
+              {/* Manual edits section */}
+              {manualChanges.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold text-slate-600 mb-2 flex items-center gap-2">
+                    <span>👤 Manual Edits ({manualChanges.length})</span>
+                  </h4>
+                  <div className="space-y-2">
+                    {manualChanges.map((change, idx) => (
+                      <ChangeCard
+                        key={`manual-${change.sectionId}-${change.field}-${idx}`}
+                        change={change}
+                        onReject={
+                          onDiscardChange ? handleDiscardChange : undefined
+                        }
+                        compact
+                      />
+                    ))}
                   </div>
                 </div>
-              ))}
+              )}
+
+              {/* AI suggestions section */}
+              {aiChanges.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold text-slate-600 mb-2 flex items-center gap-2">
+                    <span>🤖 AI Suggestions ({aiChanges.length})</span>
+                  </h4>
+                  <div className="space-y-2">
+                    {aiChanges.map((change, idx) => (
+                      <ChangeCard
+                        key={`ai-${change.sectionId}-${change.field}-${idx}`}
+                        change={change}
+                        onReject={
+                          onDiscardChange ? handleDiscardChange : undefined
+                        }
+                        compact
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Unknown source changes */}
+              {unknownChanges.length > 0 && (
+                <div className="space-y-2">
+                  {unknownChanges.map((change, idx) => (
+                    <ChangeCard
+                      key={`unknown-${change.sectionId}-${change.field}-${idx}`}
+                      change={change}
+                      onReject={
+                        onDiscardChange ? handleDiscardChange : undefined
+                      }
+                      compact
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

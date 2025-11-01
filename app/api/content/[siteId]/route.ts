@@ -30,15 +30,37 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const draft = getDraftContent(siteId);
-  if (draft) {
-    return NextResponse.json({ content: draft, draft: true });
-  }
+  // First try to get the most recent content by extracting from HTML
+  try {
+    const htmlFile = await getFileContent(site, site.htmlFile);
+    const { extractContentFromHtml } = await import("@/lib/content/extractor");
+    const extractedContent = extractContentFromHtml(htmlFile.content);
+    
+    // Check if there's a draft with more recent modifications
+    const draft = getDraftContent(siteId);
+    if (draft && draft.metadata && draft.metadata.lastModified) {
+      const draftDate = new Date(draft.metadata.lastModified);
+      const extractedDate = new Date(extractedContent.metadata.lastModified);
+      
+      if (draftDate > extractedDate) {
+        return NextResponse.json({ content: draft, draft: true });
+      }
+    }
+    
+    setDraftContent(site.id, extractedContent);
+    return NextResponse.json({ content: extractedContent, draft: false });
+  } catch (error) {
+    // Fallback to existing content.json if extraction fails
+    const draft = getDraftContent(siteId);
+    if (draft) {
+      return NextResponse.json({ content: draft, draft: true });
+    }
 
-  const file = await getFileContent(site, site.contentFile);
-  const content = JSON.parse(file.content) as WebsiteContent;
-  setDraftContent(site.id, content);
-  return NextResponse.json({ content, draft: false });
+    const file = await getFileContent(site, site.contentFile);
+    const content = JSON.parse(file.content) as WebsiteContent;
+    setDraftContent(site.id, content);
+    return NextResponse.json({ content, draft: false });
+  }
 }
 
 export async function PUT(
