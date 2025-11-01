@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { streamText, convertToModelMessages, type UIMessage } from "ai";
+import {
+  streamText,
+  convertToModelMessages,
+  stepCountIs,
+  type UIMessage,
+} from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { buildSystemPrompt } from "@/lib/ai/prompts";
 import {
@@ -104,8 +109,22 @@ export async function executeChat(
     tools: {
       applyUpdates: planTool as any,
     },
-    onFinish: async () => {
-      logger("response-complete");
+    // Enable multi-step tool execution: allows model to call tools,
+    // receive results, and continue generating or calling more tools
+    // up to 5 steps. This enables complex multi-operation workflows
+    // in a single request without requiring manual round trips.
+    stopWhen: stepCountIs(5),
+    onStepFinish: async ({ toolResults }) => {
+      logger("step-complete", {
+        toolCount: toolResults?.length || 0,
+        hasToolResults: toolResults && toolResults.length > 0,
+      });
+    },
+    onFinish: async ({ steps }) => {
+      logger("response-complete", {
+        totalSteps: steps.length,
+        toolCallCount: steps.flatMap((step) => step.toolCalls).length,
+      });
     },
     onError: async ({ error }) => {
       logger("error", { error: (error as Error).message });
