@@ -1,9 +1,21 @@
-export type SectionType = "hero" | "content" | "list" | "contact" | "custom";
+export type SectionType =
+  | "hero"
+  | "content"
+  | "list"
+  | "contact"
+  | "navigation"
+  | "footer"
+  | "article"
+  | "sidebar"
+  | "main"
+  | "orphan"
+  | "custom";
 
 export interface WebsiteMetadata {
   title: string;
   description: string;
   lastModified: string;
+  schemaVersion?: number;
 }
 
 export interface WebsiteSection {

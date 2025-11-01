@@ -1,5 +1,19 @@
 import { JSDOM } from "jsdom";
-import { WebsiteContent, WebsiteSection } from "@/types/content";
+import { WebsiteContent, WebsiteSection, SectionType } from "@/types/content";
+
+const SECTION_TYPE_TO_TAG: Record<SectionType, string> = {
+  hero: "header",
+  navigation: "nav",
+  footer: "footer",
+  article: "article",
+  sidebar: "aside",
+  main: "main",
+  content: "section",
+  list: "section",
+  contact: "section",
+  orphan: "div",
+  custom: "section",
+};
 
 function updateSectionElement(element: Element, section: WebsiteSection) {
   const { content } = section;
@@ -144,8 +158,11 @@ export function generateHtmlFromContent(
       }));
 
   sectionsArray.forEach((section: WebsiteSection) => {
+    const tagName =
+      SECTION_TYPE_TO_TAG[section.type as SectionType] ?? "section";
     // Try multiple selectors to find the section element
     let element =
+      (section.selector ? document.querySelector(section.selector) : null) ||
       document.querySelector(`#${section.id}`) ||
       document.querySelector(`[data-section="${section.id}"]`) ||
       document.querySelector(`[data-section-id="${section.id}"]`) ||
@@ -154,44 +171,49 @@ export function generateHtmlFromContent(
     // If not found by ID/data attributes, try semantic elements
     if (!element) {
       const sectionId = section.id.toLowerCase();
-      if (sectionId === 'header') {
-        element = document.querySelector('header');
-      } else if (sectionId === 'footer') {
-        element = document.querySelector('footer');
-      } else if (sectionId === 'nav' || sectionId === 'navigation') {
-        element = document.querySelector('nav');
-      } else if (sectionId === 'main') {
-        element = document.querySelector('main');
-      } else if (sectionId === 'aside') {
-        element = document.querySelector('aside');
-      } else if (sectionId === 'article') {
-        element = document.querySelector('article');
-      } else if (sectionId === 'section') {
-        element = document.querySelector('section');
+      if (sectionId === "header") {
+        element = document.querySelector("header");
+      } else if (sectionId === "footer") {
+        element = document.querySelector("footer");
+      } else if (sectionId === "nav" || sectionId === "navigation") {
+        element = document.querySelector("nav");
+      } else if (sectionId === "main") {
+        element = document.querySelector("main");
+      } else if (sectionId === "aside") {
+        element = document.querySelector("aside");
+      } else if (sectionId === "article") {
+        element = document.querySelector("article");
+      } else if (sectionId === "section") {
+        element = document.querySelector("section");
       }
     }
 
     // If we found an element but it doesn't have proper identification, add it
-    if (element && !element.id && !element.getAttribute('data-section') && !element.getAttribute('data-section-id')) {
+    if (
+      element &&
+      !element.id &&
+      !element.getAttribute("data-section") &&
+      !element.getAttribute("data-section-id")
+    ) {
       // Add ID if it's a semantic element that matches
       const sectionId = section.id.toLowerCase();
-      if (sectionId === 'header' && element.tagName === 'HEADER') {
+      if (sectionId === "header" && element.tagName === "HEADER") {
         element.id = section.id;
-      } else if (sectionId === 'footer' && element.tagName === 'FOOTER') {
+      } else if (sectionId === "footer" && element.tagName === "FOOTER") {
         element.id = section.id;
-      } else if (sectionId === 'nav' && element.tagName === 'NAV') {
+      } else if (sectionId === "nav" && element.tagName === "NAV") {
         element.id = section.id;
-      } else if (sectionId === 'main' && element.tagName === 'MAIN') {
+      } else if (sectionId === "main" && element.tagName === "MAIN") {
         element.id = section.id;
-      } else if (sectionId === 'aside' && element.tagName === 'ASIDE') {
+      } else if (sectionId === "aside" && element.tagName === "ASIDE") {
         element.id = section.id;
-      } else if (sectionId === 'article' && element.tagName === 'ARTICLE') {
+      } else if (sectionId === "article" && element.tagName === "ARTICLE") {
         element.id = section.id;
-      } else if (sectionId === 'section' && element.tagName === 'SECTION') {
+      } else if (sectionId === "section" && element.tagName === "SECTION") {
         element.id = section.id;
       } else {
         // For non-matching elements, add data attributes instead
-        element.setAttribute('data-section', section.id);
+        element.setAttribute("data-section", section.id);
       }
     }
 
@@ -199,6 +221,7 @@ export function generateHtmlFromContent(
       console.warn(`Section element not found for: ${section.id}`);
       return;
     }
+
     updateSectionElement(element, section);
   });
 
