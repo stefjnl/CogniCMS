@@ -14,8 +14,10 @@ import { ApprovalButtons } from "@/components/editor/ApprovalButtons";
 import { PublishingStatus } from "@/components/editor/PublishingStatus";
 import { SitePreview } from "@/components/editor/SitePreview";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { StatusBar } from "@/components/ui/StatusBar";
 import { diffWebsiteContent } from "@/lib/content/differ";
 import { buildCommitMessage } from "@/lib/utils/commit";
+import { useEditorShortcuts } from "@/lib/utils/keyboard";
 
 interface ChatInterfaceProps {
   site: SiteConfig;
@@ -94,6 +96,34 @@ export function ChatInterface({
 
   const isChatStreaming =
     chatStatus === "submitted" || chatStatus === "streaming";
+
+  const showSpinner = isChatStreaming;
+
+  // AI thinking progress indicator
+  const [aiThinking, setAiThinking] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isChatStreaming) {
+      const messages = [
+        "Analyzing content structure...",
+        "Understanding your request...",
+        "Generating changes...",
+        "Applying updates...",
+      ];
+      let index = 0;
+      setAiThinking(messages[0]);
+
+      const interval = setInterval(() => {
+        index = (index + 1) % messages.length;
+        setAiThinking(messages[index]);
+      }, 2000);
+
+      return () => {
+        clearInterval(interval);
+        setAiThinking(null);
+      };
+    }
+  }, [isChatStreaming]);
 
   // Update preview HTML when changes occur
   useEffect(() => {
@@ -247,6 +277,16 @@ export function ChatInterface({
     [publishState, isChatStreaming, previewChanges.length]
   );
 
+  // Keyboard shortcuts
+  useEditorShortcuts({
+    onSaveAction: () => {
+      if (!disablePublish) {
+        handlePublish();
+      }
+    },
+    onUndoAction: handleReset,
+  });
+
   useEffect(() => {
     if (chatStatus !== "ready") {
       return;
@@ -289,16 +329,21 @@ export function ChatInterface({
     [uiMessages]
   );
 
-  const showSpinner = isChatStreaming;
-
   return (
     <div className="flex h-screen flex-col">
-      <div className="flex-shrink-0 p-6">
+      <div className="flex-shrink-0 border-b border-slate-200 bg-white p-6">
         <SiteHeader site={site} lastSynced={lastModified} />
+        <div className="mt-4">
+          <StatusBar
+            gitHubConnected={true}
+            aiModel="GPT-OSS-120B"
+            unpublishedChanges={previewChanges.length}
+          />
+        </div>
       </div>
 
       {/* Main layout: Left column (2 rows) + Right column (site preview) */}
-      <div className="flex flex-1 gap-6 overflow-hidden p-6">
+      <div className="flex flex-1 gap-6 overflow-hidden bg-slate-50 p-6">
         {/* Left Column: Top = Content Overview, Bottom = AI Chat */}
         <div className="flex w-2/5 flex-col gap-6">
           {/* Top Left: Content Overview + Preview Panel */}
@@ -347,9 +392,16 @@ export function ChatInterface({
             />
 
             {showSpinner && (
-              <div className="flex items-center gap-2 text-sm text-slate-600">
+              <div className="flex items-center gap-3 rounded-lg border border-brand-200 bg-brand-50 p-3">
                 <LoadingSpinner />
-                <span>AI is thinking...</span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-brand-900">
+                    AI is working...
+                  </p>
+                  {aiThinking && (
+                    <p className="text-xs text-brand-700">{aiThinking}</p>
+                  )}
+                </div>
               </div>
             )}
 

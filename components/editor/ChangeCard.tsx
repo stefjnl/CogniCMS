@@ -2,6 +2,7 @@
 
 import { PreviewChange } from "@/types/content";
 import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 
 interface ChangeCardProps {
   change: PreviewChange;
@@ -21,21 +22,65 @@ export function ChangeCard({
     return JSON.stringify(value, null, 2);
   };
 
+  const getChangeType = (): { label: string; color: string; icon: string } => {
+    if (change.currentValue === null || change.currentValue === "") {
+      return {
+        label: "Addition",
+        color: "bg-success-100 text-success-700 border-success-200",
+        icon: "➕",
+      };
+    }
+    if (change.proposedValue === null || change.proposedValue === "") {
+      return {
+        label: "Deletion",
+        color: "bg-red-100 text-red-700 border-red-200",
+        icon: "➖",
+      };
+    }
+    return {
+      label: "Modification",
+      color: "bg-brand-100 text-brand-700 border-brand-200",
+      icon: "✏️",
+    };
+  };
+
+  const changeType = getChangeType();
+
   if (compact) {
     return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
-        <div className="flex items-start justify-between gap-2">
+      <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-all hover:shadow-md">
+        <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
-            <p className="font-medium text-slate-900">
-              ✏️ {change.sectionLabel} • {change.field}
+            <div className="mb-2 flex items-center gap-2">
+              <span
+                className={`rounded border px-2 py-0.5 text-xs font-medium ${changeType.color}`}
+              >
+                {changeType.icon} {changeType.label}
+              </span>
+              <span className="text-xs text-slate-500">
+                {change.sectionLabel}
+              </span>
+            </div>
+            <p className="mb-2 text-sm font-medium text-slate-900">
+              {change.field}
             </p>
-            <div className="mt-2 space-y-1 text-xs">
-              <div className="text-red-600">
-                - {formatValue(change.currentValue)}
-              </div>
-              <div className="text-green-600">
-                + {formatValue(change.proposedValue)}
-              </div>
+            <div className="space-y-1 text-xs">
+              {change.currentValue && (
+                <div className="flex items-start gap-2">
+                  <span className="flex-shrink-0 text-red-600">−</span>
+                  <span className="text-slate-600 line-through">
+                    {formatValue(change.currentValue)}
+                  </span>
+                </div>
+              )}
+              {change.proposedValue && (
+                <div className="flex items-start gap-2">
+                  <span className="flex-shrink-0 text-success-600">+</span>
+                  <span className="font-medium text-slate-900">
+                    {formatValue(change.proposedValue)}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
           {(onApply || onReject) && (
@@ -43,8 +88,10 @@ export function ChangeCard({
               {onApply && (
                 <Button
                   size="sm"
+                  variant="primary"
                   onClick={() => onApply(change)}
                   className="text-xs"
+                  title="Apply this change"
                 >
                   ✓
                 </Button>
@@ -55,6 +102,7 @@ export function ChangeCard({
                   variant="secondary"
                   onClick={() => onReject(change)}
                   className="text-xs"
+                  title="Reject this change"
                 >
                   ✗
                 </Button>
@@ -67,35 +115,46 @@ export function ChangeCard({
   }
 
   return (
-    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 shadow-sm">
-      <div className="mb-3 flex items-start justify-between">
-        <div>
-          <h4 className="font-semibold text-blue-900">📝 PROPOSED CHANGE</h4>
-          <p className="mt-1 text-sm text-blue-700">
-            Section: <span className="font-medium">{change.sectionLabel}</span>
-          </p>
-          <p className="text-sm text-blue-700">
-            Field: <span className="font-medium">{change.field}</span>
-          </p>
+    <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-md">
+      <div className="mb-4 flex items-start justify-between">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span
+              className={`rounded border px-2.5 py-1 text-xs font-semibold ${changeType.color}`}
+            >
+              {changeType.icon} {changeType.label}
+            </span>
+            <Badge variant="secondary">{change.sectionLabel}</Badge>
+          </div>
+          <h4 className="text-lg font-semibold text-slate-900">
+            {change.field}
+          </h4>
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div className="rounded bg-white p-3">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Current
+      {/* Side-by-side diff view */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-red-700">
+            <span>−</span>
+            <span>Current Value</span>
           </p>
           <pre className="whitespace-pre-wrap text-sm text-slate-700">
-            {formatValue(change.currentValue)}
+            {formatValue(change.currentValue) || (
+              <span className="italic text-slate-400">(empty)</span>
+            )}
           </pre>
         </div>
 
-        <div className="rounded bg-white p-3">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-blue-600">
-            New
+        <div className="rounded-lg border border-success-200 bg-success-50 p-4">
+          <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-success-700">
+            <span>+</span>
+            <span>Proposed Value</span>
           </p>
-          <pre className="whitespace-pre-wrap text-sm text-slate-900">
-            {formatValue(change.proposedValue)}
+          <pre className="whitespace-pre-wrap text-sm font-medium text-slate-900">
+            {formatValue(change.proposedValue) || (
+              <span className="italic text-slate-400">(empty)</span>
+            )}
           </pre>
         </div>
       </div>
@@ -103,8 +162,8 @@ export function ChangeCard({
       {(onApply || onReject) && (
         <div className="mt-4 flex gap-2">
           {onApply && (
-            <Button onClick={() => onApply(change)} size="sm">
-              ✓ Apply This
+            <Button onClick={() => onApply(change)} size="sm" variant="primary">
+              ✓ Apply Change
             </Button>
           )}
           {onReject && (
@@ -113,7 +172,7 @@ export function ChangeCard({
               onClick={() => onReject(change)}
               size="sm"
             >
-              ✗ Reject
+              ✗ Reject Change
             </Button>
           )}
         </div>

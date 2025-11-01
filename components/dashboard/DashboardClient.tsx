@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { SiteSummary } from "@/types/site";
 import { SiteList } from "@/components/dashboard/SiteList";
+import { SiteAnalytics } from "@/components/dashboard/SiteAnalytics";
 import { AddSiteModal } from "@/components/dashboard/AddSiteModal";
 
 interface DashboardClientProps {
@@ -26,6 +27,11 @@ export function DashboardClient({ initialSites }: DashboardClientProps) {
 
   return (
     <>
+      {sites.length > 0 && (
+        <div className="mb-8">
+          <SiteAnalytics sites={sites} />
+        </div>
+      )}
       <SiteList
         sites={sites}
         onAddSite={() => {
