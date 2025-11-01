@@ -1,5 +1,5 @@
-import { JSDOM } from "jsdom";
 import { PreviewChange } from "@/types/content";
+import { JSDOM } from "jsdom";
 
 /**
  * Get the actual selector for a section change
@@ -261,6 +261,11 @@ function applyChangeToElement(element: Element, change: PreviewChange): void {
     ) {
       target = element.querySelector("a, button");
       console.log("[APPLY_CHANGE] Strategy 3c - button selector result:", target?.tagName);
+    } else if (field === "paragraphs" && Array.isArray(proposedValue)) {
+      // For paragraphs field, don't find a single target - the element itself is the container
+      // Set target to null to skip the single-value strategies and go directly to array handling
+      console.log("[APPLY_CHANGE] Strategy 3d - paragraphs array detected, will use array handler");
+      // Don't set target - let it fall through to array handling below
     }
   }
 
@@ -270,21 +275,31 @@ function applyChangeToElement(element: Element, change: PreviewChange): void {
     console.log("[APPLY_CHANGE] Strategy 4 - using parent element as it's a text container");
   }
 
-  // If we still don't have a target, don't replace the entire element
-  if (!target) {
+  // For array values like "paragraphs", "lists", "links", we apply them using the element as container
+  // even if target is not found, since the array handler searches within the element
+  const isArrayField = Array.isArray(proposedValue) && (field === "paragraphs" || field === "lists" || field === "links");
+  
+  // If we still don't have a target and it's NOT an array field, skip
+  if (!target && !isArrayField) {
     console.warn("[APPLY_CHANGE] No suitable target found, skipping update to avoid destroying element structure");
     return;
   }
 
-  console.log("[APPLY_CHANGE] Final target element:", {
+  console.log("[APPLY_CHANGE] Final target element:", target ? {
     tagName: target.tagName,
     id: target.id,
     className: target.className,
     currentContent: target.textContent?.substring(0, 100)
-  });
+  } : "null (will use element as container)");
 
   // Apply the value based on type
   if (typeof proposedValue === "string") {
+    // String values require a target element
+    if (!target) {
+      console.warn("[APPLY_CHANGE] No target found for string value, skipping");
+      return;
+    }
+    
     console.log("[APPLY_CHANGE] Applying string value:", proposedValue);
     // For simple strings, update text content
     if (target.tagName === "A" || target.tagName === "BUTTON") {
@@ -298,16 +313,19 @@ function applyChangeToElement(element: Element, change: PreviewChange): void {
     console.log("[APPLY_CHANGE] String value applied, new content:", target.textContent?.substring(0, 100));
   } else if (Array.isArray(proposedValue)) {
     console.log("[APPLY_CHANGE] Applying array value:", proposedValue);
+    // For arrays, use the element as the container (not the target)
+    const container = target || element;
+    
     // Handle arrays (lists, paragraphs, etc.)
     if (field === "paragraphs") {
-      const paragraphs = Array.from(element.querySelectorAll("p"));
+      const paragraphs = Array.from(container.querySelectorAll("p"));
       proposedValue.forEach((value: unknown, index: number) => {
         if (typeof value === "string" && paragraphs[index]) {
           paragraphs[index].textContent = value;
         }
       });
     } else if (field === "lists" || field.toLowerCase().includes("list")) {
-      const lists = Array.from(element.querySelectorAll("ul, ol"));
+      const lists = Array.from(container.querySelectorAll("ul, ol"));
       proposedValue.forEach((items: unknown, index: number) => {
         if (!Array.isArray(items)) return;
         const list = lists[index];
@@ -328,7 +346,7 @@ function applyChangeToElement(element: Element, change: PreviewChange): void {
         });
       });
     } else if (field === "links") {
-      const anchors = Array.from(element.querySelectorAll("a"));
+      const anchors = Array.from(container.querySelectorAll("a"));
       proposedValue.forEach((link: unknown, index: number) => {
         if (!link || typeof link !== "object") return;
         const anchor = anchors[index];

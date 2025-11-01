@@ -1,23 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type UIMessage } from "ai";
-import { SiteConfig } from "@/types/site";
-import { WebsiteContent, PreviewChange } from "@/types/content";
-import { MessageList } from "@/components/editor/MessageList";
-import { MessageInput } from "@/components/editor/MessageInput";
-import { PreviewPanel } from "@/components/editor/PreviewPanel";
-import { ContentOverview } from "@/components/editor/ContentOverview";
-import { SiteHeader } from "@/components/editor/SiteHeader";
 import { ApprovalButtons } from "@/components/editor/ApprovalButtons";
+import { ContentOverview } from "@/components/editor/ContentOverview";
+import { MessageInput } from "@/components/editor/MessageInput";
+import { MessageList } from "@/components/editor/MessageList";
+import { PreviewPanel } from "@/components/editor/PreviewPanel";
 import { PublishingStatus } from "@/components/editor/PublishingStatus";
+import { SiteHeader } from "@/components/editor/SiteHeader";
 import { SitePreview } from "@/components/editor/SitePreview";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { StatusBar } from "@/components/ui/StatusBar";
 import { diffWebsiteContent } from "@/lib/content/differ";
+import { usePreviewUpdate, usePublishHandler } from "@/lib/hooks";
 import { buildCommitMessage } from "@/lib/utils/commit";
 import { useEditorShortcuts } from "@/lib/utils/keyboard";
+import { PreviewChange, WebsiteContent } from "@/types/content";
+import { SiteConfig } from "@/types/site";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport, type UIMessage } from "ai";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface ChatInterfaceProps {
   site: SiteConfig;
@@ -55,15 +56,10 @@ export function ChatInterface({
     initialContent
   );
   const [currentHTML, setCurrentHTML] = useState<string>(initialHTML);
-  const [previewHTML, setPreviewHTML] = useState<string>(initialHTML);
   const [previewChanges, setPreviewChanges] = useState<PreviewChange[]>([]);
   const [commitMessage, setCommitMessage] = useState(
     "[CogniCMS] Content update"
   );
-  const [publishState, setPublishState] = useState<
-    "idle" | "pending" | "publishing" | "published" | "error"
-  >("idle");
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
   const [lastAppliedAssistantId, setLastAppliedAssistantId] = useState<
     string | null
@@ -74,6 +70,40 @@ export function ChatInterface({
     editMode: "inline" | "modal";
   } | null>(null);
   const baselineRef = useRef<WebsiteContent>(initialContent);
+
+  // Use the preview update hook for automatic preview generation
+  const {
+    previewHTML,
+    isPreviewLoading,
+    updatePreview,
+  } = usePreviewUpdate({
+    siteId: site.id,
+    currentHTML,
+  });
+
+  // Use the publish handler hook for coordinated publish operations
+  const {
+    publishState,
+    statusMessage,
+    handlePublish: executePublish,
+    resetPublishState,
+  } = usePublishHandler({
+    site,
+    draftContent,
+    currentHTML,
+    previewHTML,
+    previewChanges,
+    commitMessage,
+    onSuccess: (publishedHTML: string) => {
+      // After successful publish, update baseline
+      baselineRef.current = draftContent!;
+      setCurrentHTML(publishedHTML);
+      setPreviewChanges([]);
+    },
+    onError: (error: string) => {
+      setClientError(error);
+    },
+  });
 
   const transport = useMemo(
     () =>
@@ -130,80 +160,11 @@ export function ChatInterface({
     }
   }, [isChatStreaming]);
 
-  // Update preview HTML when changes occur
+  // Update preview automatically when changes occur
+  // This effect replaces the manual setTimeout calls
   useEffect(() => {
-    const updatePreview = async () => {
-      console.log("[CHAT_INTERFACE] Preview update useEffect triggered");
-      console.log(
-        "[CHAT_INTERFACE] previewChanges.length:",
-        previewChanges.length
-      );
-      console.log(
-        "[CHAT_INTERFACE] currentHTML length:",
-        currentHTML?.length || 0
-      );
-      console.log(
-        "[CHAT_INTERFACE] previewChanges:",
-        JSON.stringify(previewChanges, null, 2)
-      );
-
-      if (previewChanges.length > 0) {
-        try {
-          console.log("[CHAT_INTERFACE] Calling preview API...");
-          const response = await fetch(`/api/preview/${site.id}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              currentHTML: currentHTML, // Always use the base HTML from GitHub
-              changes: previewChanges,
-              sections: draftContent?.sections || [],
-            }),
-          });
-
-          console.log(
-            "[CHAT_INTERFACE] Preview API response status:",
-            response.status
-          );
-
-          if (response.ok) {
-            const { html } = await response.json();
-            console.log(
-              "[CHAT_INTERFACE] Preview API returned HTML length:",
-              html?.length || 0
-            );
-            console.log(
-              "[CHAT_INTERFACE] Preview HTML preview:",
-              html?.substring(0, 200) + "..."
-            );
-            
-            // DEBUG LOGGING: Track when previewHTML is being set
-            console.log("[CHAT_INTERFACE] About to setPreviewHTML with length:", html?.length || 0);
-            console.log("[CHAT_INTERFACE] Current previewHTML length before update:", previewHTML?.length || 0);
-            setPreviewHTML(html);
-            console.log("[CHAT_INTERFACE] setPreviewHTML called (async update)");
-          } else {
-            console.error(
-              "[CHAT_INTERFACE] Failed to generate preview, status:",
-              response.status
-            );
-            setPreviewHTML(currentHTML);
-          }
-        } catch (error) {
-          console.error("[CHAT_INTERFACE] Preview update failed:", error);
-          setPreviewHTML(currentHTML);
-        }
-      } else {
-        console.log(
-          "[CHAT_INTERFACE] No changes to preview, using currentHTML"
-        );
-        setPreviewHTML(currentHTML);
-      }
-    };
-
-    // Add a small delay to ensure all state updates are processed
-    const timeoutId = setTimeout(updatePreview, 100);
-    return () => clearTimeout(timeoutId);
-  }, [currentHTML, previewChanges, site.id, draftContent]);
+    updatePreview(previewChanges, draftContent?.sections || []);
+  }, [previewChanges, draftContent?.sections, updatePreview]);
 
   const diffAgainstBaseline = useCallback(
     (nextContent: WebsiteContent) =>
@@ -226,12 +187,8 @@ export function ChatInterface({
       setPreviewChanges(changes);
       const nextCommit = buildCommitMessage(changes);
       setCommitMessage(nextCommit);
-      if (payloadExplanation) {
-        setStatusMessage(payloadExplanation);
-      }
-      if (changes.length > 0) {
-        setPublishState("pending");
-      }
+      // statusMessage is now managed by the publish hook, so we skip that
+      // preview updates are now automatic via the effect
     },
     [diffAgainstBaseline, site.id]
   );
@@ -240,8 +197,6 @@ export function ChatInterface({
     async (message: string) => {
       try {
         setClientError(null);
-        setStatusMessage(null);
-        setPublishState("idle");
         clearError?.();
         await sendMessage(
           { text: message },
@@ -262,113 +217,20 @@ export function ChatInterface({
     setDraftContent(baselineRef.current);
     setPreviewChanges([]);
     setCommitMessage("[CogniCMS] Content update");
-    setPublishState("idle");
+    resetPublishState();
     await fetch(`/api/content/${site.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(baselineRef.current),
     });
-  }, [site.id]);
+  }, [site.id, resetPublishState]);
 
+  // handlePublish is now delegated to the usePublishHandler hook
+  // This wraps executePublish and clears errors
   const handlePublish = useCallback(async () => {
-    if (!draftContent) return;
-    setPublishState("publishing");
     setClientError(null);
-    setStatusMessage(null);
-
-    // DEBUG LOGGING: Track HTML lengths at publish time
-    console.log("[HANDLE_PUBLISH] Starting publish process");
-    console.log("[HANDLE_PUBLISH] currentHTML length:", currentHTML?.length || 0);
-    console.log("[HANDLE_PUBLISH] previewHTML length:", previewHTML?.length || 0);
-    console.log("[HANDLE_PUBLISH] previewChanges count:", previewChanges?.length || 0);
-    console.log("[HANDLE_PUBLISH] Are currentHTML and previewHTML different?", currentHTML !== previewHTML);
-    
-    // Create a unique identifier for this publish operation
-    const publishId = (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
-      ? crypto.randomUUID()
-      : Math.random().toString(36).substring(2);
-    console.log("[HANDLE_PUBLISH] Publish ID:", publishId);
-    
-    // ALWAYS generate a fresh preview to ensure we have the latest HTML
-    // This fixes the race condition where previewHTML might not be updated
-    let htmlToPublish = previewHTML;
-    console.log("[HANDLE_PUBLISH] Initial HTML length:", htmlToPublish?.length || 0);
-    
-    if (previewChanges.length > 0) {
-      console.log("[HANDLE_PUBLISH] Generating fresh preview to ensure latest HTML...");
-      try {
-        const previewResponse = await fetch(`/api/preview/${site.id}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            currentHTML: currentHTML,
-            changes: previewChanges,
-            sections: draftContent?.sections || [],
-            publishId: publishId, // Add publishId to track in logs
-          }),
-        });
-        
-        if (previewResponse.ok) {
-          const { html } = await previewResponse.json();
-          htmlToPublish = html;
-          console.log("[HANDLE_PUBLISH] Generated fresh preview HTML, length:", html?.length || 0);
-          console.log("[HANDLE_PUBLISH] Fresh HTML checksum:", html?.length.toString() + '_' + html?.substring(0, 50).replace(/\s/g, ''));
-          
-          // CRITICAL: Update the state BEFORE sending publish request
-          setPreviewHTML(html);
-          
-          // Add a small delay to ensure state update is processed
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
-          console.log("[HANDLE_PUBLISH] State updated, proceeding with publish");
-        } else {
-          console.error("[HANDLE_PUBLISH] Failed to generate fresh preview, using existing");
-          console.log("[HANDLE_PUBLISH] Preview API response status:", previewResponse.status);
-        }
-      } catch (error) {
-        console.error("[HANDLE_PUBLISH] Error generating fresh preview:", error);
-      }
-    } else {
-      console.log("[HANDLE_PUBLISH] No changes to preview, using current previewHTML");
-    }
-    
-    console.log("[HANDLE_PUBLISH] Final HTML being sent to publish API length:", htmlToPublish?.length || 0);
-    console.log("[HANDLE_PUBLISH] Final HTML checksum:", htmlToPublish?.length.toString() + '_' + htmlToPublish?.substring(0, 50).replace(/\s/g, ''));
-
-    try {
-      const response = await fetch(`/api/publish/${site.id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          content: draftContent,
-          html: htmlToPublish, // Use the ensured-up-to-date HTML
-          commitMessage,
-        }),
-      });
-
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Failed to publish changes");
-      }
-
-      // After successful publish, update baseline and keep the published HTML
-      // Don't refetch from GitHub immediately as it may serve cached/old version
-      setCurrentHTML(htmlToPublish);
-      baselineRef.current = draftContent;
-      setPreviewChanges([]);
-      setPublishState("published");
-      setStatusMessage(payload.message ?? "Changes published successfully.");
-
-      // Reset to idle after 5 seconds
-      setTimeout(() => {
-        setPublishState("idle");
-        setStatusMessage(null);
-      }, 5000);
-    } catch (err) {
-      setClientError((err as Error).message);
-      setPublishState("error");
-    }
-  }, [commitMessage, currentHTML, draftContent, site.id, previewHTML]);
+    await executePublish();
+  }, [executePublish]);
 
   // Manual editing handlers
   const handleStartEdit = useCallback(
@@ -384,12 +246,6 @@ export function ChatInterface({
 
   const handleSaveEdit = useCallback(
     async (sectionId: string, field: string, newValue: unknown) => {
-      console.log("[HANDLE_SAVE_EDIT] Manual edit save started");
-      console.log("[HANDLE_SAVE_EDIT] sectionId:", sectionId);
-      console.log("[HANDLE_SAVE_EDIT] field:", field);
-      console.log("[HANDLE_SAVE_EDIT] newValue:", newValue);
-      console.log("[HANDLE_SAVE_EDIT] draftContent exists:", !!draftContent);
-
       if (!draftContent) return;
 
       try {
@@ -438,14 +294,6 @@ export function ChatInterface({
             change.source === "ai"
         );
 
-        if (hasAIChangeForField) {
-          // Show toast notification about replacement
-          setStatusMessage(
-            `Replaced AI suggestion for "${field}" with your edit`
-          );
-          setTimeout(() => setStatusMessage(null), 3000);
-        }
-
         // Persist to cache
         const persistResponse = await fetch(`/api/content/${site.id}`, {
           method: "PUT",
@@ -458,16 +306,10 @@ export function ChatInterface({
         }
 
         // Update local state
-        console.log("[HANDLE_SAVE_EDIT] Updating draftContent state");
         setDraftContent(updatedContent);
 
         // Generate diff with source tracking
-        console.log("[HANDLE_SAVE_EDIT] Generating diff against baseline");
         const changes = diffAgainstBaseline(updatedContent);
-        console.log(
-          "[HANDLE_SAVE_EDIT] Generated changes:",
-          JSON.stringify(changes, null, 2)
-        );
 
         // Mark this specific change as manual (others from diff are AI)
         const updatedChanges = changes.map((change) => {
@@ -486,99 +328,24 @@ export function ChatInterface({
           };
         });
 
-        console.log(
-          "[HANDLE_SAVE_EDIT] Updated changes with source tracking:",
-          JSON.stringify(updatedChanges, null, 2)
-        );
         setPreviewChanges(updatedChanges);
 
         // Update commit message
         const nextCommit = buildCommitMessage(updatedChanges);
         setCommitMessage(nextCommit);
 
-        // Set to pending if we have changes
-        if (updatedChanges.length > 0) {
-          setPublishState("pending");
-        }
-
         // Close the editor
         setEditingField(null);
 
-        // Show success message
-        setStatusMessage("Change saved to draft");
-        setTimeout(() => setStatusMessage(null), 2000);
+        // Show success message - no status hook in this component level
+        // Preview update will happen automatically via the effect
+        // when previewChanges is updated above
 
-        // CRITICAL: Force immediate preview update for manual edits
-        console.log(
-          "[HANDLE_SAVE_EDIT] Manual edit completed, forcing preview update"
-        );
-        console.log(
-          "[HANDLE_SAVE_EDIT] Current previewChanges count:",
-          updatedChanges.length
-        );
-        console.log(
-          "[HANDLE_SAVE_EDIT] Current previewChanges:",
-          JSON.stringify(updatedChanges, null, 2)
-        );
-        console.log(
-          "[HANDLE_SAVE_EDIT] Current currentHTML length:",
-          currentHTML?.length || 0
-        );
-        console.log(
-          "[HANDLE_SAVE_EDIT] Current previewHTML length:",
-          previewHTML?.length || 0
-        );
-
-        // Force immediate preview update
-        if (updatedChanges.length > 0) {
-          console.log(
-            "[HANDLE_SAVE_EDIT] Triggering immediate preview update..."
-          );
-          setTimeout(async () => {
-            try {
-              const response = await fetch(`/api/preview/${site.id}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  currentHTML,
-                  changes: updatedChanges,
-                  sections: updatedContent?.sections || [],
-                }),
-              });
-
-              if (response.ok) {
-                const { html } = await response.json();
-                console.log(
-                  "[HANDLE_SAVE_EDIT] Immediate preview update successful, HTML length:",
-                  html?.length || 0
-                );
-                setPreviewHTML(html);
-              } else {
-                console.error(
-                  "[HANDLE_SAVE_EDIT] Immediate preview update failed, status:",
-                  response.status
-                );
-              }
-            } catch (error) {
-              console.error(
-                "[HANDLE_SAVE_EDIT] Immediate preview update error:",
-                error
-              );
-            }
-          }, 200); // Small delay to ensure state is updated
-        }
       } catch (err) {
         setClientError((err as Error).message);
       }
     },
-    [
-      draftContent,
-      diffAgainstBaseline,
-      previewChanges,
-      site.id,
-      currentHTML,
-      previewHTML,
-    ]
+    [draftContent, diffAgainstBaseline, previewChanges, site.id]
   );
 
   const handleDiscardChange = useCallback(
@@ -659,7 +426,7 @@ export function ChatInterface({
 
         // Update publish state
         if (changes.length === 0) {
-          setPublishState("idle");
+          resetPublishState();
         }
       } catch (err) {
         setClientError((err as Error).message);
