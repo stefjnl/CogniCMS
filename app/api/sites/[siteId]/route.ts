@@ -2,14 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { deleteSite, getSiteConfig, updateSite } from "@/lib/storage/sites";
 import { requireSession } from "@/lib/utils/auth";
 import { siteSchema } from "@/lib/utils/validation";
+import {
+  AuthError,
+  NotFoundError,
+  sanitizeError,
+  logError,
+} from "@/lib/utils/errors";
 
 // Note: Uses Node.js runtime due to file-based storage (fs, path, crypto)
 // To enable Edge Runtime: migrate to database storage (e.g., Vercel KV, Postgres)
 export const runtime = "nodejs";
-
-function authError() {
-  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-}
 
 export async function GET(
   _: NextRequest,
@@ -17,18 +19,27 @@ export async function GET(
 ) {
   try {
     await requireSession();
-  } catch {
-    return authError();
+    const { siteId } = await context.params;
+    const site = await getSiteConfig(siteId);
+
+    if (!site) {
+      throw new NotFoundError("Site");
+    }
+
+    return NextResponse.json({ site });
+  } catch (error) {
+    logError(error, { route: "/api/sites/[siteId]", method: "GET" });
+
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const sanitized = sanitizeError(error);
+    return NextResponse.json(
+      { error: sanitized.message, digest: sanitized.digest },
+      { status: sanitized.statusCode }
+    );
   }
-
-  const { siteId } = await context.params;
-
-  const site = await getSiteConfig(siteId);
-  if (!site) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  return NextResponse.json({ site });
 }
 
 export async function PATCH(
@@ -37,18 +48,42 @@ export async function PATCH(
 ) {
   try {
     await requireSession();
-  } catch {
-    return authError();
-  }
+    const body = await request.json();
+    const parsed = siteSchema.partial().parse(body);
+    const { siteId } = await context.params;
+    const site = await updateSite(siteId, parsed);
 
-  const body = await request.json();
-  const parsed = siteSchema.partial().parse(body);
-  const { siteId } = await context.params;
-  const site = await updateSite(siteId, parsed);
-  if (!site) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!site) {
+      throw new NotFoundError("Site");
+    }
+
+    return NextResponse.json({ site });
+  } catch (error) {
+    logError(error, { route: "/api/sites/[siteId]", method: "PATCH" });
+
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Zod validation errors
+    if (
+      error &&
+      typeof error === "object" &&
+      "name" in error &&
+      error.name === "ZodError"
+    ) {
+      return NextResponse.json(
+        { error: "Invalid request data", details: error },
+        { status: 400 }
+      );
+    }
+
+    const sanitized = sanitizeError(error);
+    return NextResponse.json(
+      { error: sanitized.message, digest: sanitized.digest },
+      { status: sanitized.statusCode }
+    );
   }
-  return NextResponse.json({ site });
 }
 
 export async function DELETE(
@@ -57,11 +92,27 @@ export async function DELETE(
 ) {
   try {
     await requireSession();
-  } catch {
-    return authError();
-  }
+    const { siteId } = await context.params;
 
-  const { siteId } = await context.params;
-  await deleteSite(siteId);
-  return NextResponse.json({ success: true });
+    // Check if site exists before deleting
+    const site = await getSiteConfig(siteId);
+    if (!site) {
+      throw new NotFoundError("Site");
+    }
+
+    await deleteSite(siteId);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    logError(error, { route: "/api/sites/[siteId]", method: "DELETE" });
+
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const sanitized = sanitizeError(error);
+    return NextResponse.json(
+      { error: sanitized.message, digest: sanitized.digest },
+      { status: sanitized.statusCode }
+    );
+  }
 }

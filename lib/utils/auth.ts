@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { SignJWT, jwtVerify } from "jose";
+import { AuthError } from "@/lib/utils/errors";
 
 const SESSION_COOKIE = "cognicms_session";
 const SESSION_DURATION_HOURS = Number(process.env.SESSION_DURATION ?? 24);
@@ -76,7 +77,7 @@ export async function getSession(): Promise<AuthSession | null> {
 export async function requireSession(): Promise<AuthSession> {
   const session = await getSession();
   if (!session) {
-    throw new Error("Not authenticated");
+    throw new AuthError("Authentication required");
   }
   return session;
 }

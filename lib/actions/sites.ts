@@ -11,18 +11,29 @@ import {
 import { siteSchema } from "@/lib/utils/validation";
 import type { SiteConfig } from "@/types/site";
 import type { SiteInput } from "@/lib/utils/validation";
+import {
+  AuthError,
+  NotFoundError,
+  ValidationError,
+  sanitizeError,
+  logError,
+  isOperationalError,
+} from "@/lib/utils/errors";
 
 /**
  * Site Management Server Actions
  *
  * These actions handle CRUD operations for sites with proper
- * authentication and validation.
+ * authentication and validation. Implements Best Practices #9 and #10:
+ * - Expected errors (AppError) return user-friendly messages
+ * - Unexpected errors are sanitized and logged
  */
 
 interface ActionResult<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
+  digest?: string;
 }
 
 /**
@@ -31,14 +42,6 @@ interface ActionResult<T = unknown> {
 export async function getSitesAction(): Promise<ActionResult<SiteConfig[]>> {
   try {
     await requireSession();
-  } catch {
-    return {
-      success: false,
-      error: "Unauthorized",
-    };
-  }
-
-  try {
     const sites = await listSites();
     // Convert to full site configs
     const fullSites = await Promise.all(
@@ -49,9 +52,22 @@ export async function getSitesAction(): Promise<ActionResult<SiteConfig[]>> {
       data: fullSites.filter((s): s is SiteConfig => s !== null),
     };
   } catch (error) {
+    logError(error, { action: "getSitesAction" });
+
+    // Expected errors (AppError) - show user message
+    if (isOperationalError(error)) {
+      return {
+        success: false,
+        error: error.userMessage,
+      };
+    }
+
+    // Unexpected errors - sanitize
+    const sanitized = sanitizeError(error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to fetch sites",
+      error: sanitized.message,
+      digest: sanitized.digest,
     };
   }
 }
@@ -64,29 +80,31 @@ export async function getSiteAction(
 ): Promise<ActionResult<SiteConfig>> {
   try {
     await requireSession();
-  } catch {
-    return {
-      success: false,
-      error: "Unauthorized",
-    };
-  }
-
-  try {
     const site = await getSiteConfig(siteId);
+
     if (!site) {
-      return {
-        success: false,
-        error: "Site not found",
-      };
+      throw new NotFoundError("Site");
     }
+
     return {
       success: true,
       data: site,
     };
   } catch (error) {
+    logError(error, { action: "getSiteAction", siteId });
+
+    if (isOperationalError(error)) {
+      return {
+        success: false,
+        error: error.userMessage,
+      };
+    }
+
+    const sanitized = sanitizeError(error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to fetch site",
+      error: sanitized.message,
+      digest: sanitized.digest,
     };
   }
 }
