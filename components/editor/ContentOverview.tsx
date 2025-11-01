@@ -45,9 +45,6 @@ export function ContentOverview({
     );
   };
 
-  // Debug logging
-  console.log("ContentOverview - content:", content);
-  console.log("ContentOverview - sections:", content?.sections);
 
   if (!content || !content.sections) {
     return (

@@ -1,6 +1,37 @@
 import { JSDOM } from "jsdom";
 import { WebsiteContent, WebsiteSection, SectionType } from "@/types/content";
 
+/**
+ * Generate a unique selector for an element that can be used to find it later
+ */
+function generateSelectorForElement(element: Element, index: number): string {
+  // Strategy 1: If element has an ID, use it
+  if (element.id) {
+    return `#${element.id}`;
+  }
+  
+  // Strategy 2: Use class names with element type
+  if (element.className) {
+    const classes = element.className.trim().split(/\s+/).filter(Boolean);
+    if (classes.length > 0) {
+      return `${element.tagName.toLowerCase()}.${classes.join('.')}`;
+    }
+  }
+  
+  // Strategy 3: Use element type with position
+  const parent = element.parentElement;
+  if (parent) {
+    const siblings = Array.from(parent.querySelectorAll(element.tagName.toLowerCase()));
+    const siblingIndex = siblings.indexOf(element);
+    if (siblingIndex > 0) {
+      return `${element.tagName.toLowerCase()}:nth-of-type(${siblingIndex + 1})`;
+    }
+  }
+  
+  // Strategy 4: Use element type with section index
+  return `${element.tagName.toLowerCase()}:nth-of-type(${index + 1})`;
+}
+
 function inferSectionType(element: Element): SectionType {
   if (element.getAttribute("data-section-type")) {
     return element.getAttribute("data-section-type") as SectionType;
@@ -68,12 +99,16 @@ export function extractContentFromHtml(html: string): WebsiteContent {
       element.getAttribute("aria-label") ??
       element.getAttribute("data-label") ??
       id;
+    
+    // Generate a reliable selector for this element
+    const selector = generateSelectorForElement(element, index);
 
     sections.push({
       id,
       label,
       type: inferSectionType(element),
       content: extractSectionContent(element),
+      selector, // Store the selector for later use
     });
   });
 

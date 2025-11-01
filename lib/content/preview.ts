@@ -2,11 +2,67 @@ import { JSDOM } from "jsdom";
 import { PreviewChange } from "@/types/content";
 
 /**
+ * Get the actual selector for a section change
+ * This function tries multiple strategies to find the right element
+ */
+export function getSelectorForChange(change: PreviewChange, sections?: any[]): string {
+  const selectors = [];
+  
+  // If we have sections data, try to find the matching section and use its selector
+  if (sections) {
+    const matchingSection = sections.find(section => section.id === change.sectionId);
+    if (matchingSection && matchingSection.selector) {
+      selectors.push(matchingSection.selector);
+    }
+  }
+  
+  // Strategy 1: Try ID matching section ID
+  selectors.push(`#${change.sectionId}`);
+  
+  // Strategy 2: Try data attribute matching section ID
+  selectors.push(`[data-section="${change.sectionId}"]`);
+  selectors.push(`[data-section-id="${change.sectionId}"]`);
+  
+  // Strategy 3: Try class matching section ID
+  selectors.push(`.${change.sectionId}`);
+  
+  // Strategy 4: Try semantic elements based on section ID
+  const sectionId = change.sectionId.toLowerCase();
+  if (sectionId === 'header') {
+    selectors.push('header');
+  } else if (sectionId === 'footer') {
+    selectors.push('footer');
+  } else if (sectionId === 'nav' || sectionId === 'navigation') {
+    selectors.push('nav');
+  } else if (sectionId === 'main') {
+    selectors.push('main');
+  } else if (sectionId === 'aside') {
+    selectors.push('aside');
+  } else if (sectionId === 'article') {
+    selectors.push('article');
+  } else if (sectionId === 'section') {
+    selectors.push('section');
+  }
+  
+  // Strategy 5: Try elements with specific IDs that might contain the content
+  // Based on the known IDs in the HTML
+  const knownIds = ['newsletter', 'newsletterForm', 'newsletterFeedback', 'copyEmailBtn', 'backToTop', 'privacyModal', 'privacyClose', 'copyFeedback'];
+  if (knownIds.includes(change.sectionId)) {
+    selectors.push(`#${change.sectionId}`);
+  }
+  
+  // Return all selectors as a comma-separated list
+  // The applyChangesToHTML will use querySelector which will try them in order
+  return selectors.join(', ');
+}
+
+/**
  * Apply changes to HTML by modifying the DOM elements
  */
 export function applyChangesToHTML(
   originalHTML: string,
-  changes: PreviewChange[]
+  changes: PreviewChange[],
+  sections?: any[]
 ): string {
   console.log("[APPLY_CHANGES] Starting applyChangesToHTML");
   console.log("[APPLY_CHANGES] Original HTML length:", originalHTML?.length || 0);
@@ -26,7 +82,7 @@ export function applyChangesToHTML(
   for (const change of changes) {
     try {
       console.log("[APPLY_CHANGES] Processing change:", change);
-      const selector = getSelectorForChange(change);
+      const selector = getSelectorForChange(change, sections);
       console.log("[APPLY_CHANGES] Generated selector:", selector);
       
       const element = document.querySelector(selector);
@@ -61,7 +117,8 @@ export function applyChangesToHTML(
  */
 export function addChangeHighlights(
   html: string,
-  changes: PreviewChange[]
+  changes: PreviewChange[],
+  sections?: any[]
 ): string {
   if (!changes || changes.length === 0) {
     return html;
@@ -72,6 +129,7 @@ export function addChangeHighlights(
 
   // Inject highlight CSS into the head
   const style = document.createElement("style");
+  style.setAttribute("data-cognicms-highlight", "true");
   style.textContent = `
     .cognicms-changed {
       outline: 3px solid #16a34a !important;
@@ -114,7 +172,7 @@ export function addChangeHighlights(
   // Add the class to changed elements
   for (const change of changes) {
     try {
-      const selector = getSelectorForChange(change);
+      const selector = getSelectorForChange(change, sections);
       const element = document.querySelector(selector);
 
       if (element) {
@@ -132,52 +190,6 @@ export function addChangeHighlights(
   return dom.serialize();
 }
 
-/**
- * Get CSS selector for a change
- * Tries multiple strategies to find the right element
- */
-export function getSelectorForChange(change: PreviewChange): string {
-  const selectors = [];
-  
-  // Strategy 1: Try ID matching section ID
-  selectors.push(`#${change.sectionId}`);
-  
-  // Strategy 2: Try data attribute matching section ID
-  selectors.push(`[data-section="${change.sectionId}"]`);
-  selectors.push(`[data-section-id="${change.sectionId}"]`);
-  
-  // Strategy 3: Try class matching section ID
-  selectors.push(`.${change.sectionId}`);
-  
-  // Strategy 4: Try semantic elements based on section ID
-  const sectionId = change.sectionId.toLowerCase();
-  if (sectionId === 'header') {
-    selectors.push('header');
-  } else if (sectionId === 'footer') {
-    selectors.push('footer');
-  } else if (sectionId === 'nav' || sectionId === 'navigation') {
-    selectors.push('nav');
-  } else if (sectionId === 'main') {
-    selectors.push('main');
-  } else if (sectionId === 'aside') {
-    selectors.push('aside');
-  } else if (sectionId === 'article') {
-    selectors.push('article');
-  } else if (sectionId === 'section') {
-    selectors.push('section');
-  }
-  
-  // Strategy 5: Try elements with specific IDs that might contain the content
-  // Based on the known IDs in the HTML
-  const knownIds = ['newsletter', 'newsletterForm', 'newsletterFeedback', 'copyEmailBtn', 'backToTop', 'privacyModal', 'privacyClose', 'copyFeedback'];
-  if (knownIds.includes(change.sectionId)) {
-    selectors.push(`#${change.sectionId}`);
-  }
-  
-  // Return all selectors as a comma-separated list
-  // The applyChangesToHTML will use querySelector which will try them in order
-  return selectors.join(', ');
-}
 
 /**
  * Apply a change to a DOM element

@@ -50,7 +50,15 @@ export function ModalEditor({
   // Reset state when opening with new values
   useEffect(() => {
     if (open) {
-      setInputValue(String(currentValue ?? ""));
+      // Handle array values properly (e.g., paragraphs, lists)
+      let displayValue: string;
+      if (Array.isArray(currentValue)) {
+        displayValue = currentValue.join("\n");
+      } else {
+        displayValue = String(currentValue ?? "");
+      }
+
+      setInputValue(displayValue);
       setError(null);
       setIsValid(true);
       setIsDirty(false);
@@ -99,7 +107,15 @@ export function ModalEditor({
 
     // Convert to appropriate type
     let valueToSave: unknown = inputValue;
-    if (metadata.type === "number") {
+
+    // Check if the original value was an array
+    if (Array.isArray(currentValue)) {
+      // Split by newlines and filter out empty lines
+      valueToSave = inputValue
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+    } else if (metadata.type === "number") {
       valueToSave = Number(inputValue);
     }
 

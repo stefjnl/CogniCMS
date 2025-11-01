@@ -134,10 +134,19 @@ export function ChatInterface({
   useEffect(() => {
     const updatePreview = async () => {
       console.log("[CHAT_INTERFACE] Preview update useEffect triggered");
-      console.log("[CHAT_INTERFACE] previewChanges.length:", previewChanges.length);
-      console.log("[CHAT_INTERFACE] currentHTML length:", currentHTML?.length || 0);
-      console.log("[CHAT_INTERFACE] previewChanges:", JSON.stringify(previewChanges, null, 2));
-      
+      console.log(
+        "[CHAT_INTERFACE] previewChanges.length:",
+        previewChanges.length
+      );
+      console.log(
+        "[CHAT_INTERFACE] currentHTML length:",
+        currentHTML?.length || 0
+      );
+      console.log(
+        "[CHAT_INTERFACE] previewChanges:",
+        JSON.stringify(previewChanges, null, 2)
+      );
+
       if (previewChanges.length > 0) {
         try {
           console.log("[CHAT_INTERFACE] Calling preview API...");
@@ -145,20 +154,38 @@ export function ChatInterface({
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              currentHTML,
+              currentHTML: currentHTML, // Always use the base HTML from GitHub
               changes: previewChanges,
+              sections: draftContent?.sections || [],
             }),
           });
 
-          console.log("[CHAT_INTERFACE] Preview API response status:", response.status);
-          
+          console.log(
+            "[CHAT_INTERFACE] Preview API response status:",
+            response.status
+          );
+
           if (response.ok) {
             const { html } = await response.json();
-            console.log("[CHAT_INTERFACE] Preview API returned HTML length:", html?.length || 0);
-            console.log("[CHAT_INTERFACE] Preview HTML preview:", html?.substring(0, 200) + "...");
+            console.log(
+              "[CHAT_INTERFACE] Preview API returned HTML length:",
+              html?.length || 0
+            );
+            console.log(
+              "[CHAT_INTERFACE] Preview HTML preview:",
+              html?.substring(0, 200) + "..."
+            );
+            
+            // DEBUG LOGGING: Track when previewHTML is being set
+            console.log("[CHAT_INTERFACE] About to setPreviewHTML with length:", html?.length || 0);
+            console.log("[CHAT_INTERFACE] Current previewHTML length before update:", previewHTML?.length || 0);
             setPreviewHTML(html);
+            console.log("[CHAT_INTERFACE] setPreviewHTML called (async update)");
           } else {
-            console.error("[CHAT_INTERFACE] Failed to generate preview, status:", response.status);
+            console.error(
+              "[CHAT_INTERFACE] Failed to generate preview, status:",
+              response.status
+            );
             setPreviewHTML(currentHTML);
           }
         } catch (error) {
@@ -166,7 +193,9 @@ export function ChatInterface({
           setPreviewHTML(currentHTML);
         }
       } else {
-        console.log("[CHAT_INTERFACE] No changes to preview, using currentHTML");
+        console.log(
+          "[CHAT_INTERFACE] No changes to preview, using currentHTML"
+        );
         setPreviewHTML(currentHTML);
       }
     };
@@ -174,7 +203,7 @@ export function ChatInterface({
     // Add a small delay to ensure all state updates are processed
     const timeoutId = setTimeout(updatePreview, 100);
     return () => clearTimeout(timeoutId);
-  }, [currentHTML, previewChanges, site.id]);
+  }, [currentHTML, previewChanges, site.id, draftContent]);
 
   const diffAgainstBaseline = useCallback(
     (nextContent: WebsiteContent) =>
@@ -247,13 +276,70 @@ export function ChatInterface({
     setClientError(null);
     setStatusMessage(null);
 
+    // DEBUG LOGGING: Track HTML lengths at publish time
+    console.log("[HANDLE_PUBLISH] Starting publish process");
+    console.log("[HANDLE_PUBLISH] currentHTML length:", currentHTML?.length || 0);
+    console.log("[HANDLE_PUBLISH] previewHTML length:", previewHTML?.length || 0);
+    console.log("[HANDLE_PUBLISH] previewChanges count:", previewChanges?.length || 0);
+    console.log("[HANDLE_PUBLISH] Are currentHTML and previewHTML different?", currentHTML !== previewHTML);
+    
+    // Create a unique identifier for this publish operation
+    const publishId = crypto.randomUUID();
+    console.log("[HANDLE_PUBLISH] Publish ID:", publishId);
+    
+    // ALWAYS generate a fresh preview to ensure we have the latest HTML
+    // This fixes the race condition where previewHTML might not be updated
+    let htmlToPublish = previewHTML;
+    console.log("[HANDLE_PUBLISH] Initial HTML length:", htmlToPublish?.length || 0);
+    
+    if (previewChanges.length > 0) {
+      console.log("[HANDLE_PUBLISH] Generating fresh preview to ensure latest HTML...");
+      try {
+        const previewResponse = await fetch(`/api/preview/${site.id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            currentHTML: currentHTML,
+            changes: previewChanges,
+            sections: draftContent?.sections || [],
+            publishId: publishId, // Add publishId to track in logs
+          }),
+        });
+        
+        if (previewResponse.ok) {
+          const { html } = await previewResponse.json();
+          htmlToPublish = html;
+          console.log("[HANDLE_PUBLISH] Generated fresh preview HTML, length:", html?.length || 0);
+          console.log("[HANDLE_PUBLISH] Fresh HTML checksum:", html?.length.toString() + '_' + html?.substring(0, 50).replace(/\s/g, ''));
+          
+          // CRITICAL: Update the state BEFORE sending publish request
+          setPreviewHTML(html);
+          
+          // Add a small delay to ensure state update is processed
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          console.log("[HANDLE_PUBLISH] State updated, proceeding with publish");
+        } else {
+          console.error("[HANDLE_PUBLISH] Failed to generate fresh preview, using existing");
+          console.log("[HANDLE_PUBLISH] Preview API response status:", previewResponse.status);
+        }
+      } catch (error) {
+        console.error("[HANDLE_PUBLISH] Error generating fresh preview:", error);
+      }
+    } else {
+      console.log("[HANDLE_PUBLISH] No changes to preview, using current previewHTML");
+    }
+    
+    console.log("[HANDLE_PUBLISH] Final HTML being sent to publish API length:", htmlToPublish?.length || 0);
+    console.log("[HANDLE_PUBLISH] Final HTML checksum:", htmlToPublish?.length.toString() + '_' + htmlToPublish?.substring(0, 50).replace(/\s/g, ''));
+
     try {
       const response = await fetch(`/api/publish/${site.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content: draftContent,
-          html: currentHTML, // Base HTML for regeneration
+          html: htmlToPublish, // Use the ensured-up-to-date HTML
           commitMessage,
         }),
       });
@@ -263,14 +349,9 @@ export function ChatInterface({
         throw new Error(payload.error ?? "Failed to publish changes");
       }
 
-      // After successful publish, fetch the updated HTML
-      const htmlResponse = await fetch(`/api/content/${site.id}/html`);
-      if (htmlResponse.ok) {
-        const { html } = await htmlResponse.json();
-        setCurrentHTML(html);
-        setPreviewHTML(html);
-      }
-
+      // After successful publish, update baseline and keep the published HTML
+      // Don't refetch from GitHub immediately as it may serve cached/old version
+      setCurrentHTML(htmlToPublish);
       baselineRef.current = draftContent;
       setPreviewChanges([]);
       setPublishState("published");
@@ -285,7 +366,7 @@ export function ChatInterface({
       setClientError((err as Error).message);
       setPublishState("error");
     }
-  }, [commitMessage, currentHTML, draftContent, site.id]);
+  }, [commitMessage, currentHTML, draftContent, site.id, previewHTML]);
 
   // Manual editing handlers
   const handleStartEdit = useCallback(
@@ -306,7 +387,7 @@ export function ChatInterface({
       console.log("[HANDLE_SAVE_EDIT] field:", field);
       console.log("[HANDLE_SAVE_EDIT] newValue:", newValue);
       console.log("[HANDLE_SAVE_EDIT] draftContent exists:", !!draftContent);
-      
+
       if (!draftContent) return;
 
       try {
@@ -381,7 +462,10 @@ export function ChatInterface({
         // Generate diff with source tracking
         console.log("[HANDLE_SAVE_EDIT] Generating diff against baseline");
         const changes = diffAgainstBaseline(updatedContent);
-        console.log("[HANDLE_SAVE_EDIT] Generated changes:", JSON.stringify(changes, null, 2));
+        console.log(
+          "[HANDLE_SAVE_EDIT] Generated changes:",
+          JSON.stringify(changes, null, 2)
+        );
 
         // Mark this specific change as manual (others from diff are AI)
         const updatedChanges = changes.map((change) => {
@@ -400,7 +484,10 @@ export function ChatInterface({
           };
         });
 
-        console.log("[HANDLE_SAVE_EDIT] Updated changes with source tracking:", JSON.stringify(updatedChanges, null, 2));
+        console.log(
+          "[HANDLE_SAVE_EDIT] Updated changes with source tracking:",
+          JSON.stringify(updatedChanges, null, 2)
+        );
         setPreviewChanges(updatedChanges);
 
         // Update commit message
@@ -418,17 +505,33 @@ export function ChatInterface({
         // Show success message
         setStatusMessage("Change saved to draft");
         setTimeout(() => setStatusMessage(null), 2000);
-        
+
         // CRITICAL: Force immediate preview update for manual edits
-        console.log("[HANDLE_SAVE_EDIT] Manual edit completed, forcing preview update");
-        console.log("[HANDLE_SAVE_EDIT] Current previewChanges count:", updatedChanges.length);
-        console.log("[HANDLE_SAVE_EDIT] Current previewChanges:", JSON.stringify(updatedChanges, null, 2));
-        console.log("[HANDLE_SAVE_EDIT] Current currentHTML length:", currentHTML?.length || 0);
-        console.log("[HANDLE_SAVE_EDIT] Current previewHTML length:", previewHTML?.length || 0);
-        
+        console.log(
+          "[HANDLE_SAVE_EDIT] Manual edit completed, forcing preview update"
+        );
+        console.log(
+          "[HANDLE_SAVE_EDIT] Current previewChanges count:",
+          updatedChanges.length
+        );
+        console.log(
+          "[HANDLE_SAVE_EDIT] Current previewChanges:",
+          JSON.stringify(updatedChanges, null, 2)
+        );
+        console.log(
+          "[HANDLE_SAVE_EDIT] Current currentHTML length:",
+          currentHTML?.length || 0
+        );
+        console.log(
+          "[HANDLE_SAVE_EDIT] Current previewHTML length:",
+          previewHTML?.length || 0
+        );
+
         // Force immediate preview update
         if (updatedChanges.length > 0) {
-          console.log("[HANDLE_SAVE_EDIT] Triggering immediate preview update...");
+          console.log(
+            "[HANDLE_SAVE_EDIT] Triggering immediate preview update..."
+          );
           setTimeout(async () => {
             try {
               const response = await fetch(`/api/preview/${site.id}`, {
@@ -437,18 +540,28 @@ export function ChatInterface({
                 body: JSON.stringify({
                   currentHTML,
                   changes: updatedChanges,
+                  sections: updatedContent?.sections || [],
                 }),
               });
 
               if (response.ok) {
                 const { html } = await response.json();
-                console.log("[HANDLE_SAVE_EDIT] Immediate preview update successful, HTML length:", html?.length || 0);
+                console.log(
+                  "[HANDLE_SAVE_EDIT] Immediate preview update successful, HTML length:",
+                  html?.length || 0
+                );
                 setPreviewHTML(html);
               } else {
-                console.error("[HANDLE_SAVE_EDIT] Immediate preview update failed, status:", response.status);
+                console.error(
+                  "[HANDLE_SAVE_EDIT] Immediate preview update failed, status:",
+                  response.status
+                );
               }
             } catch (error) {
-              console.error("[HANDLE_SAVE_EDIT] Immediate preview update error:", error);
+              console.error(
+                "[HANDLE_SAVE_EDIT] Immediate preview update error:",
+                error
+              );
             }
           }, 200); // Small delay to ensure state is updated
         }
@@ -456,7 +569,14 @@ export function ChatInterface({
         setClientError((err as Error).message);
       }
     },
-    [draftContent, diffAgainstBaseline, previewChanges, site.id, currentHTML, previewHTML]
+    [
+      draftContent,
+      diffAgainstBaseline,
+      previewChanges,
+      site.id,
+      currentHTML,
+      previewHTML,
+    ]
   );
 
   const handleDiscardChange = useCallback(

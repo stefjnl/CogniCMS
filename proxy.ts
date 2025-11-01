@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { isSessionValid } from "@/lib/utils/auth";
 
 const PROTECTED_PREFIXES = [
@@ -10,31 +10,29 @@ const PROTECTED_PREFIXES = [
   "/api/publish",
 ];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const requiresAuth = PROTECTED_PREFIXES.some((prefix) =>
     pathname.startsWith(prefix)
   );
 
   if (!requiresAuth) {
-    return NextResponse.next();
+    return;
   }
 
   const token = request.cookies.get("cognicms_session")?.value;
   const valid = await isSessionValid(token);
   if (!valid) {
     if (pathname.startsWith("/api")) {
-      return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
       });
     }
 
     const loginUrl = new URL("/", request.url);
-    return NextResponse.redirect(loginUrl);
+    return Response.redirect(loginUrl);
   }
-
-  return NextResponse.next();
 }
 
 export const config = {

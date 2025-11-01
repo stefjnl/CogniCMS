@@ -66,8 +66,10 @@ export function decryptSecret(payload: string): string {
     return result;
   } catch (error) {
     console.error("[CRYPTO] Decryption failed:", error);
-    console.error("[CRYPTO] Error type:", error.constructor.name);
-    console.error("[CRYPTO] Error message:", error.message);
-    throw new Error(`Failed to decrypt GitHub token: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorType = error instanceof Error ? error.constructor.name : 'Unknown';
+    console.error("[CRYPTO] Error type:", errorType);
+    console.error("[CRYPTO] Error message:", errorMessage);
+    throw new Error(`Failed to decrypt GitHub token: ${errorMessage}`);
   }
 }

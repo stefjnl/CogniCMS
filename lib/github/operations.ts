@@ -299,18 +299,20 @@ export async function publishFiles(
             `1. The repository doesn't exist or is not accessible\n` +
             `2. The token doesn't have write permissions (needs 'repo' scope)\n` +
             `3. The base tree reference is invalid\n` +
-            `Repository: ${owner}/${repo}\n` +
+            `Repository: ${site.githubOwner}/${site.githubRepo}\n` +
             `Branch: ${site.githubBranch}\n` +
             `OAuth scopes: ${error.response?.headers?.['x-oauth-scopes'] || 'None'}\n` +
             `Original error: ${error.message}`
           );
         } else if (error.request?.url?.includes('/git/refs/')) {
+          const normalizedOwner = normalizeOwner(site.githubOwner);
+          const normalizedRepo = normalizeRepo(site.githubRepo);
           throw new Error(
             `GitHub returned 404 when getting branch reference. This usually means:\n` +
             `1. The branch '${site.githubBranch}' doesn't exist\n` +
             `2. The repository doesn't exist or is not accessible\n` +
             `3. The token doesn't have read permissions\n` +
-            `Repository: ${owner}/${repo}\n` +
+            `Repository: ${normalizedOwner}/${normalizedRepo}\n` +
             `Original error: ${error.message}`
           );
         }

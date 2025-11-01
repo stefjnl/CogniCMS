@@ -11,6 +11,7 @@ export interface WebsiteSection {
   type: SectionType;
   label: string;
   content: Record<string, unknown>;
+  selector?: string; // CSS selector to find this section in the original HTML
 }
 
 export interface WebsiteContent {
