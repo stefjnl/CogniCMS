@@ -284,7 +284,9 @@ export function ChatInterface({
     console.log("[HANDLE_PUBLISH] Are currentHTML and previewHTML different?", currentHTML !== previewHTML);
     
     // Create a unique identifier for this publish operation
-    const publishId = crypto.randomUUID();
+    const publishId = (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
+      ? crypto.randomUUID()
+      : Math.random().toString(36).substring(2);
     console.log("[HANDLE_PUBLISH] Publish ID:", publishId);
     
     // ALWAYS generate a fresh preview to ensure we have the latest HTML
