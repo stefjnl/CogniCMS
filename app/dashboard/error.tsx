@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { Button } from "@/components/ui/Button";
 import { Navigation } from "@/components/ui/Navigation";
 
@@ -21,6 +22,21 @@ export default function DashboardError({
       message: error.message,
       digest: error.digest,
       route: "/dashboard",
+    });
+
+    // Send to Sentry with dashboard context
+    Sentry.captureException(error, {
+      level: "error",
+      tags: {
+        boundary: "dashboard",
+        route: "/dashboard",
+        digest: error.digest || "unknown",
+      },
+      contexts: {
+        errorBoundary: {
+          componentStack: "Dashboard route",
+        },
+      },
     });
   }, [error]);
 

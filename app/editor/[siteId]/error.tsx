@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import * as Sentry from "@sentry/nextjs";
 import { Button } from "@/components/ui/Button";
 
 /**
@@ -20,10 +21,33 @@ export default function EditorError({
   const router = useRouter();
 
   useEffect(() => {
+    const route = window.location.pathname;
+    const isSiteLoadError =
+      error.message?.includes("not found") ||
+      error.message?.includes("Site configuration");
+
     console.error("[EditorErrorBoundary]", {
       message: error.message,
       digest: error.digest,
-      route: window.location.pathname,
+      route,
+      isSiteLoadError,
+    });
+
+    // Send to Sentry with editor context
+    Sentry.captureException(error, {
+      level: isSiteLoadError ? "warning" : "error",
+      tags: {
+        boundary: "editor",
+        route,
+        digest: error.digest || "unknown",
+        errorType: isSiteLoadError ? "site_not_found" : "editor_error",
+      },
+      contexts: {
+        errorBoundary: {
+          componentStack: "Editor route",
+          siteLoadError: isSiteLoadError,
+        },
+      },
     });
   }, [error]);
 

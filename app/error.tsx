@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { Button } from "@/components/ui/Button";
 
 /**
@@ -17,12 +18,25 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log error to monitoring service (e.g., Sentry)
-    // TODO: Integrate with error monitoring service
+    // Log error to Sentry
     console.error("[RootErrorBoundary]", {
       message: error.message,
       digest: error.digest,
       name: error.name,
+    });
+
+    // Send to Sentry with additional context
+    Sentry.captureException(error, {
+      level: "error",
+      tags: {
+        boundary: "root",
+        digest: error.digest || "unknown",
+      },
+      contexts: {
+        errorBoundary: {
+          componentStack: "Root application boundary",
+        },
+      },
     });
   }, [error]);
 

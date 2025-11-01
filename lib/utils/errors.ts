@@ -1,11 +1,14 @@
 /**
  * Error Handling Utilities
  *
- * Implements Best Practices #8, #9, #10:
+ * Implements Best Practices #8, #9, #10, #11:
  * - Separate expected vs unexpected errors
  * - Sanitize production error messages
  * - Provide structured error logging
+ * - Integrate with Sentry for error monitoring
  */
+
+import * as Sentry from "@sentry/nextjs";
 
 /**
  * Base class for HTTP errors
@@ -195,7 +198,7 @@ function generateErrorDigest(error: Error): string {
 }
 
 /**
- * Log error with appropriate level
+ * Log error with appropriate level and send to Sentry
  */
 export function logError(
   error: unknown,
@@ -204,7 +207,7 @@ export function logError(
   const isDevelopment = process.env.NODE_ENV === "development";
 
   if (isOperationalError(error)) {
-    // Expected errors - log as warning
+    // Expected errors - log as warning (don't send to Sentry by default)
     console.warn("[AppError]", {
       name: error.name,
       message: error.message,
@@ -212,21 +215,67 @@ export function logError(
       statusCode: error.statusCode,
       ...context,
     });
+
+    // Optionally track expected errors with lower severity
+    Sentry.captureMessage(
+      `Expected error: ${error.name} - ${error.userMessage}`,
+      {
+        level: "warning",
+        tags: {
+          errorType: "operational",
+          statusCode: error.statusCode.toString(),
+        },
+        contexts: {
+          error: {
+            name: error.name,
+            message: error.message,
+            userMessage: error.userMessage,
+          },
+          custom: context || {},
+        },
+      }
+    );
   } else {
-    // Unexpected errors - log as error with full details
+    // Unexpected errors - log as error with full details and send to Sentry
+    const errorInfo =
+      error instanceof Error
+        ? {
+            name: error.name,
+            message: error.message,
+            stack: isDevelopment ? error.stack : undefined,
+            digest: generateErrorDigest(error),
+          }
+        : { message: String(error) };
+
     console.error("[UnexpectedError]", {
-      error:
-        error instanceof Error
-          ? {
-              name: error.name,
-              message: error.message,
-              stack: isDevelopment ? error.stack : undefined,
-              digest:
-                error instanceof Error ? generateErrorDigest(error) : undefined,
-            }
-          : String(error),
+      error: errorInfo,
       ...context,
     });
+
+    // Send to Sentry with full context
+    if (error instanceof Error) {
+      Sentry.captureException(error, {
+        level: "error",
+        tags: {
+          errorType: "unexpected",
+          digest: errorInfo.digest,
+        },
+        contexts: {
+          custom: context || {},
+        },
+        fingerprint: [error.name, error.message],
+      });
+    } else {
+      Sentry.captureMessage(`Unknown error: ${String(error)}`, {
+        level: "error",
+        tags: {
+          errorType: "unexpected",
+        },
+        contexts: {
+          custom: context || {},
+        },
+      });
+    }
   }
 }
 
