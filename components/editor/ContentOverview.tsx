@@ -1,16 +1,49 @@
 "use client";
 
 import { useState } from "react";
-import { WebsiteContent } from "@/types/content";
+import { WebsiteContent, PreviewChange } from "@/types/content";
+import {
+  inferFieldMetadata,
+  shouldUseModalEditor,
+} from "@/lib/utils/fieldMetadata";
+import { FieldEditor } from "./FieldEditor";
+import { Button } from "@/components/ui/Button";
 
 interface ContentOverviewProps {
   content: WebsiteContent | null;
+  pendingChanges?: PreviewChange[];
+  onStartEdit?: (
+    sectionId: string,
+    field: string,
+    editMode: "inline" | "modal"
+  ) => void;
+  editingField?: {
+    sectionId: string;
+    field: string;
+    editMode: "inline" | "modal";
+  } | null;
+  onSaveEdit?: (sectionId: string, field: string, newValue: unknown) => void;
+  onCancelEdit?: () => void;
 }
 
-export function ContentOverview({ content }: ContentOverviewProps) {
+export function ContentOverview({
+  content,
+  pendingChanges = [],
+  onStartEdit,
+  editingField,
+  onSaveEdit,
+  onCancelEdit,
+}: ContentOverviewProps) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set()
   );
+
+  // Helper to check if a field has pending changes
+  const hasPendingChange = (sectionId: string, field: string): boolean => {
+    return pendingChanges.some(
+      (change) => change.sectionId === sectionId && change.field === field
+    );
+  };
 
   // Debug logging
   console.log("ContentOverview - content:", content);
@@ -103,15 +136,82 @@ export function ContentOverview({ content }: ContentOverviewProps) {
 
                 {isExpanded && (
                   <div className="border-t border-slate-100 bg-slate-50 px-4 py-3">
-                    <dl className="space-y-2 text-sm">
-                      {contentEntries.map(([key, value]) => (
-                        <div key={key} className="flex flex-col">
-                          <dt className="font-medium text-slate-700">{key}:</dt>
-                          <dd className="mt-1 text-slate-600">
-                            {formatValue(value)}
-                          </dd>
-                        </div>
-                      ))}
+                    <dl className="space-y-3 text-sm">
+                      {contentEntries.map(([key, value]) => {
+                        const isEditing =
+                          editingField?.sectionId === section.id &&
+                          editingField?.field === key;
+                        const isPending = hasPendingChange(section.id, key);
+                        const metadata = inferFieldMetadata(
+                          section.id,
+                          key,
+                          value
+                        );
+                        const useModal = shouldUseModalEditor(metadata, value);
+
+                        return (
+                          <div
+                            key={key}
+                            className={`flex flex-col p-2 rounded ${
+                              isPending
+                                ? "bg-amber-50 border border-amber-200"
+                                : ""
+                            }`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <dt className="font-medium text-slate-700">
+                                {key}:
+                              </dt>
+                              {!isEditing && onStartEdit && (
+                                <Button
+                                  variant="ghost"
+                                  size="xs"
+                                  onClick={() =>
+                                    onStartEdit(
+                                      section.id,
+                                      key,
+                                      useModal ? "modal" : "inline"
+                                    )
+                                  }
+                                  className="opacity-60 hover:opacity-100"
+                                  aria-label={`Edit ${key}`}
+                                >
+                                  {isPending && (
+                                    <span className="mr-1">🟡</span>
+                                  )}
+                                  ✏️ Edit
+                                </Button>
+                              )}
+                            </div>
+
+                            {isEditing ? (
+                              <div className="mt-2">
+                                <FieldEditor
+                                  sectionId={section.id}
+                                  sectionLabel={section.label}
+                                  field={key}
+                                  currentValue={value}
+                                  metadata={metadata}
+                                  editMode={editingField.editMode}
+                                  onSave={(newValue) =>
+                                    onSaveEdit?.(section.id, key, newValue)
+                                  }
+                                  onCancel={() => onCancelEdit?.()}
+                                />
+                              </div>
+                            ) : (
+                              <dd className="mt-1 text-slate-600">
+                                {formatValue(value)}
+                                {isPending && (
+                                  <span className="ml-2 text-xs text-amber-600">
+                                    (modified, not published)
+                                  </span>
+                                )}
+                              </dd>
+                            )}
+                          </div>
+                        );
+                      })}
                     </dl>
                   </div>
                 )}

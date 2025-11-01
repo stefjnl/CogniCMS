@@ -46,6 +46,30 @@ export function ChangeCard({
 
   const changeType = getChangeType();
 
+  const getSourceInfo = (): { icon: string; label: string; color: string } => {
+    if (change.source === "manual") {
+      return { icon: "👤", label: "Manual edit", color: "text-blue-600" };
+    }
+    return { icon: "🤖", label: "AI suggestion", color: "text-purple-600" };
+  };
+
+  const sourceInfo = getSourceInfo();
+
+  const getRelativeTime = (timestamp?: string): string => {
+    if (!timestamp) return "";
+    const now = new Date();
+    const then = new Date(timestamp);
+    const seconds = Math.floor((now.getTime() - then.getTime()) / 1000);
+
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} minute${minutes > 1 ? "s" : ""} ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+    const days = Math.floor(hours / 24);
+    return `${days} day${days > 1 ? "s" : ""} ago`;
+  };
+
   if (compact) {
     return (
       <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-all hover:shadow-md">
@@ -60,27 +84,44 @@ export function ChangeCard({
               <span className="text-xs text-slate-500">
                 {change.sectionLabel}
               </span>
+              {change.source && (
+                <span
+                  className={`text-xs ${sourceInfo.color}`}
+                  title={sourceInfo.label}
+                >
+                  {sourceInfo.icon}
+                </span>
+              )}
+              {change.timestamp && (
+                <span className="text-xs text-slate-400">
+                  {getRelativeTime(change.timestamp)}
+                </span>
+              )}
             </div>
             <p className="mb-2 text-sm font-medium text-slate-900">
               {change.field}
             </p>
             <div className="space-y-1 text-xs">
-              {change.currentValue && (
-                <div className="flex items-start gap-2">
-                  <span className="flex-shrink-0 text-red-600">−</span>
-                  <span className="text-slate-600 line-through">
-                    {formatValue(change.currentValue)}
-                  </span>
-                </div>
-              )}
-              {change.proposedValue && (
-                <div className="flex items-start gap-2">
-                  <span className="flex-shrink-0 text-success-600">+</span>
-                  <span className="font-medium text-slate-900">
-                    {formatValue(change.proposedValue)}
-                  </span>
-                </div>
-              )}
+              {change.currentValue !== null &&
+                change.currentValue !== undefined &&
+                change.currentValue !== "" && (
+                  <div className="flex items-start gap-2">
+                    <span className="flex-shrink-0 text-red-600">−</span>
+                    <span className="text-slate-600 line-through">
+                      {formatValue(change.currentValue)}
+                    </span>
+                  </div>
+                )}
+              {change.proposedValue !== null &&
+                change.proposedValue !== undefined &&
+                change.proposedValue !== "" && (
+                  <div className="flex items-start gap-2">
+                    <span className="flex-shrink-0 text-success-600">+</span>
+                    <span className="font-medium text-slate-900">
+                      {formatValue(change.proposedValue)}
+                    </span>
+                  </div>
+                )}
             </div>
           </div>
           {(onApply || onReject) && (
@@ -125,10 +166,23 @@ export function ChangeCard({
               {changeType.icon} {changeType.label}
             </span>
             <Badge variant="secondary">{change.sectionLabel}</Badge>
+            {change.source && (
+              <span
+                className={`text-sm ${sourceInfo.color}`}
+                title={sourceInfo.label}
+              >
+                {sourceInfo.icon} {sourceInfo.label}
+              </span>
+            )}
           </div>
           <h4 className="text-lg font-semibold text-slate-900">
             {change.field}
           </h4>
+          {change.timestamp && (
+            <p className="text-xs text-slate-500">
+              Changed {getRelativeTime(change.timestamp)}
+            </p>
+          )}
         </div>
       </div>
 

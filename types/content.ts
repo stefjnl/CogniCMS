@@ -29,6 +29,23 @@ export interface PreviewChange {
   changeType: "update" | "add" | "remove";
   currentValue: unknown;
   proposedValue: unknown;
+  source?: "manual" | "ai";
+  timestamp?: string;
+}
+
+export interface FieldMetadata {
+  type: "text" | "longtext" | "email" | "url" | "date" | "time" | "number";
+  label: string;
+  required: boolean;
+  maxLength?: number;
+  pattern?: string;
+  placeholder?: string;
+  helpText?: string;
+}
+
+export interface ValidationResult {
+  isValid: boolean;
+  error?: string;
 }
 
 export interface PreviewData {

@@ -25,10 +25,22 @@ export function SitePreview({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const changeCount = proposedChanges.length;
 
+  // TRACE: Log when component receives new props
+  useEffect(() => {
+    console.log("[SITE_PREVIEW] SitePreview component updated");
+    console.log("[SITE_PREVIEW] siteId:", siteId);
+    console.log("[SITE_PREVIEW] currentHTML length:", currentHTML?.length || 0);
+    console.log("[SITE_PREVIEW] currentHTML preview:", currentHTML?.substring(0, 200) + "...");
+    console.log("[SITE_PREVIEW] proposedChanges count:", proposedChanges.length);
+    console.log("[SITE_PREVIEW] proposedChanges:", JSON.stringify(proposedChanges, null, 2));
+  }, [siteId, currentHTML, proposedChanges]);
+
   // Auto-scroll to first changed element when changes are applied
   useEffect(() => {
+    console.log("[SITE_PREVIEW] Auto-scroll useEffect triggered, changeCount:", changeCount);
     if (changeCount > 0) {
       const timer = setTimeout(() => {
+        console.log("[SITE_PREVIEW] Attempting to scroll to first change");
         scrollToFirstChange();
       }, 500);
       return () => clearTimeout(timer);
@@ -37,20 +49,35 @@ export function SitePreview({
 
   const scrollToFirstChange = () => {
     const iframe = iframeRef.current;
-    if (!iframe?.contentWindow) return;
+    console.log("[SITE_PREVIEW] scrollToFirstChange called, iframe exists:", !!iframe);
+    
+    if (!iframe?.contentWindow) {
+      console.log("[SITE_PREVIEW] No iframe content window available");
+      return;
+    }
 
     try {
       const doc = iframe.contentWindow.document;
+      console.log("[SITE_PREVIEW] Document available:", !!doc);
+      
       const firstChanged = doc.querySelector(".cognicms-changed");
+      console.log("[SITE_PREVIEW] Found changed elements:", !!firstChanged);
 
       if (firstChanged) {
+        console.log("[SITE_PREVIEW] Scrolling to first changed element:", firstChanged.tagName);
         firstChanged.scrollIntoView({
           behavior: "smooth",
           block: "center",
         });
+      } else {
+        console.log("[SITE_PREVIEW] No elements with .cognicms-changed class found");
+        console.log("[SITE_PREVIEW] Available classes in document:");
+        const allElements = doc.querySelectorAll('[class]');
+        const classes = Array.from(allElements).map(el => el.className);
+        console.log("[SITE_PREVIEW] Classes found:", classes);
       }
     } catch (error) {
-      console.error("Failed to scroll to change:", error);
+      console.error("[SITE_PREVIEW] Failed to scroll to change:", error);
     }
   };
 
@@ -97,6 +124,10 @@ export function SitePreview({
             sandbox="allow-same-origin allow-scripts"
             className="h-[800px] w-full border-0"
             title="Site Preview"
+            onLoad={() => {
+              console.log("[SITE_PREVIEW] iframe loaded");
+              console.log("[SITE_PREVIEW] iframe content length:", currentHTML?.length || 0);
+            }}
           />
         </div>
       </div>

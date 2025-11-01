@@ -68,6 +68,11 @@ export function ChatInterface({
   const [lastAppliedAssistantId, setLastAppliedAssistantId] = useState<
     string | null
   >(null);
+  const [editingField, setEditingField] = useState<{
+    sectionId: string;
+    field: string;
+    editMode: "inline" | "modal";
+  } | null>(null);
   const baselineRef = useRef<WebsiteContent>(initialContent);
 
   const transport = useMemo(
@@ -128,8 +133,14 @@ export function ChatInterface({
   // Update preview HTML when changes occur
   useEffect(() => {
     const updatePreview = async () => {
+      console.log("[CHAT_INTERFACE] Preview update useEffect triggered");
+      console.log("[CHAT_INTERFACE] previewChanges.length:", previewChanges.length);
+      console.log("[CHAT_INTERFACE] currentHTML length:", currentHTML?.length || 0);
+      console.log("[CHAT_INTERFACE] previewChanges:", JSON.stringify(previewChanges, null, 2));
+      
       if (previewChanges.length > 0) {
         try {
+          console.log("[CHAT_INTERFACE] Calling preview API...");
           const response = await fetch(`/api/preview/${site.id}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -139,23 +150,30 @@ export function ChatInterface({
             }),
           });
 
+          console.log("[CHAT_INTERFACE] Preview API response status:", response.status);
+          
           if (response.ok) {
             const { html } = await response.json();
+            console.log("[CHAT_INTERFACE] Preview API returned HTML length:", html?.length || 0);
+            console.log("[CHAT_INTERFACE] Preview HTML preview:", html?.substring(0, 200) + "...");
             setPreviewHTML(html);
           } else {
-            console.error("Failed to generate preview");
+            console.error("[CHAT_INTERFACE] Failed to generate preview, status:", response.status);
             setPreviewHTML(currentHTML);
           }
         } catch (error) {
-          console.error("Preview update failed:", error);
+          console.error("[CHAT_INTERFACE] Preview update failed:", error);
           setPreviewHTML(currentHTML);
         }
       } else {
+        console.log("[CHAT_INTERFACE] No changes to preview, using currentHTML");
         setPreviewHTML(currentHTML);
       }
     };
 
-    updatePreview();
+    // Add a small delay to ensure all state updates are processed
+    const timeoutId = setTimeout(updatePreview, 100);
+    return () => clearTimeout(timeoutId);
   }, [currentHTML, previewChanges, site.id]);
 
   const diffAgainstBaseline = useCallback(
@@ -269,6 +287,269 @@ export function ChatInterface({
     }
   }, [commitMessage, currentHTML, draftContent, site.id]);
 
+  // Manual editing handlers
+  const handleStartEdit = useCallback(
+    (sectionId: string, field: string, editMode: "inline" | "modal") => {
+      setEditingField({ sectionId, field, editMode });
+    },
+    []
+  );
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingField(null);
+  }, []);
+
+  const handleSaveEdit = useCallback(
+    async (sectionId: string, field: string, newValue: unknown) => {
+      console.log("[HANDLE_SAVE_EDIT] Manual edit save started");
+      console.log("[HANDLE_SAVE_EDIT] sectionId:", sectionId);
+      console.log("[HANDLE_SAVE_EDIT] field:", field);
+      console.log("[HANDLE_SAVE_EDIT] newValue:", newValue);
+      console.log("[HANDLE_SAVE_EDIT] draftContent exists:", !!draftContent);
+      
+      if (!draftContent) return;
+
+      try {
+        // Clone the content
+        const updatedContent: WebsiteContent = JSON.parse(
+          JSON.stringify(draftContent)
+        );
+
+        // Handle both array and object formats for sections
+        const sectionsArray = Array.isArray(updatedContent.sections)
+          ? updatedContent.sections
+          : Object.entries(updatedContent.sections).map(
+              ([id, section]: [string, any]) => ({
+                id,
+                label: section.label || id,
+                type: section.type || "content",
+                content: section.content || section,
+              })
+            );
+
+        // Find and update the section
+        const section = sectionsArray.find((s) => s.id === sectionId);
+        if (!section) {
+          throw new Error(`Section ${sectionId} not found`);
+        }
+
+        // Update the field value
+        section.content[field] = newValue;
+
+        // If sections was originally an object, convert back
+        if (!Array.isArray(updatedContent.sections)) {
+          const sectionsObj: Record<string, any> = {};
+          sectionsArray.forEach((s) => {
+            sectionsObj[s.id] = s;
+          });
+          (updatedContent as any).sections = sectionsObj;
+        } else {
+          updatedContent.sections = sectionsArray;
+        }
+
+        // Check for conflicts with AI-generated changes
+        const hasAIChangeForField = previewChanges.some(
+          (change) =>
+            change.sectionId === sectionId &&
+            change.field === field &&
+            change.source === "ai"
+        );
+
+        if (hasAIChangeForField) {
+          // Show toast notification about replacement
+          setStatusMessage(
+            `Replaced AI suggestion for "${field}" with your edit`
+          );
+          setTimeout(() => setStatusMessage(null), 3000);
+        }
+
+        // Persist to cache
+        const persistResponse = await fetch(`/api/content/${site.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedContent),
+        });
+
+        if (!persistResponse.ok) {
+          throw new Error("Failed to save edit");
+        }
+
+        // Update local state
+        console.log("[HANDLE_SAVE_EDIT] Updating draftContent state");
+        setDraftContent(updatedContent);
+
+        // Generate diff with source tracking
+        console.log("[HANDLE_SAVE_EDIT] Generating diff against baseline");
+        const changes = diffAgainstBaseline(updatedContent);
+        console.log("[HANDLE_SAVE_EDIT] Generated changes:", JSON.stringify(changes, null, 2));
+
+        // Mark this specific change as manual (others from diff are AI)
+        const updatedChanges = changes.map((change) => {
+          if (change.sectionId === sectionId && change.field === field) {
+            return {
+              ...change,
+              source: "manual" as const,
+              timestamp: new Date().toISOString(),
+            };
+          }
+          // Preserve existing source or default to AI
+          return {
+            ...change,
+            source: change.source || ("ai" as const),
+            timestamp: change.timestamp || new Date().toISOString(),
+          };
+        });
+
+        console.log("[HANDLE_SAVE_EDIT] Updated changes with source tracking:", JSON.stringify(updatedChanges, null, 2));
+        setPreviewChanges(updatedChanges);
+
+        // Update commit message
+        const nextCommit = buildCommitMessage(updatedChanges);
+        setCommitMessage(nextCommit);
+
+        // Set to pending if we have changes
+        if (updatedChanges.length > 0) {
+          setPublishState("pending");
+        }
+
+        // Close the editor
+        setEditingField(null);
+
+        // Show success message
+        setStatusMessage("Change saved to draft");
+        setTimeout(() => setStatusMessage(null), 2000);
+        
+        // CRITICAL: Force immediate preview update for manual edits
+        console.log("[HANDLE_SAVE_EDIT] Manual edit completed, forcing preview update");
+        console.log("[HANDLE_SAVE_EDIT] Current previewChanges count:", updatedChanges.length);
+        console.log("[HANDLE_SAVE_EDIT] Current previewChanges:", JSON.stringify(updatedChanges, null, 2));
+        console.log("[HANDLE_SAVE_EDIT] Current currentHTML length:", currentHTML?.length || 0);
+        console.log("[HANDLE_SAVE_EDIT] Current previewHTML length:", previewHTML?.length || 0);
+        
+        // Force immediate preview update
+        if (updatedChanges.length > 0) {
+          console.log("[HANDLE_SAVE_EDIT] Triggering immediate preview update...");
+          setTimeout(async () => {
+            try {
+              const response = await fetch(`/api/preview/${site.id}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  currentHTML,
+                  changes: updatedChanges,
+                }),
+              });
+
+              if (response.ok) {
+                const { html } = await response.json();
+                console.log("[HANDLE_SAVE_EDIT] Immediate preview update successful, HTML length:", html?.length || 0);
+                setPreviewHTML(html);
+              } else {
+                console.error("[HANDLE_SAVE_EDIT] Immediate preview update failed, status:", response.status);
+              }
+            } catch (error) {
+              console.error("[HANDLE_SAVE_EDIT] Immediate preview update error:", error);
+            }
+          }, 200); // Small delay to ensure state is updated
+        }
+      } catch (err) {
+        setClientError((err as Error).message);
+      }
+    },
+    [draftContent, diffAgainstBaseline, previewChanges, site.id, currentHTML, previewHTML]
+  );
+
+  const handleDiscardChange = useCallback(
+    async (sectionId: string, field: string) => {
+      if (!draftContent) return;
+
+      try {
+        // Clone baseline content
+        const revertedContent: WebsiteContent = JSON.parse(
+          JSON.stringify(draftContent)
+        );
+
+        // Handle both array and object formats for sections
+        const sectionsArray = Array.isArray(revertedContent.sections)
+          ? revertedContent.sections
+          : Object.entries(revertedContent.sections).map(
+              ([id, section]: [string, any]) => ({
+                id,
+                label: section.label || id,
+                type: section.type || "content",
+                content: section.content || section,
+              })
+            );
+
+        const baselineSectionsArray = Array.isArray(
+          baselineRef.current.sections
+        )
+          ? baselineRef.current.sections
+          : Object.entries(baselineRef.current.sections).map(
+              ([id, section]: [string, any]) => ({
+                id,
+                label: section.label || id,
+                type: section.type || "content",
+                content: section.content || section,
+              })
+            );
+
+        // Find the section
+        const section = sectionsArray.find((s) => s.id === sectionId);
+        if (!section) return;
+
+        // Revert the field to baseline value
+        const baselineSection = baselineSectionsArray.find(
+          (s) => s.id === sectionId
+        );
+        if (baselineSection && baselineSection.content[field] !== undefined) {
+          section.content[field] = baselineSection.content[field];
+        }
+
+        // If sections was originally an object, convert back
+        if (!Array.isArray(revertedContent.sections)) {
+          const sectionsObj: Record<string, any> = {};
+          sectionsArray.forEach((s) => {
+            sectionsObj[s.id] = s;
+          });
+          (revertedContent as any).sections = sectionsObj;
+        } else {
+          revertedContent.sections = sectionsArray;
+        }
+
+        // Persist to cache
+        await fetch(`/api/content/${site.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(revertedContent),
+        });
+
+        // Update local state
+        setDraftContent(revertedContent);
+
+        // Recompute changes
+        const changes = diffAgainstBaseline(revertedContent);
+        setPreviewChanges(changes);
+
+        // Update commit message
+        const nextCommit = buildCommitMessage(changes);
+        setCommitMessage(nextCommit);
+
+        // Update publish state
+        if (changes.length === 0) {
+          setPublishState("idle");
+        }
+      } catch (err) {
+        setClientError((err as Error).message);
+      }
+    },
+    [draftContent, diffAgainstBaseline, site.id]
+  );
+
+  const handleDiscardAll = useCallback(async () => {
+    await handleReset();
+  }, [handleReset]);
+
   const disablePublish = useMemo(
     () =>
       publishState === "publishing" ||
@@ -348,11 +629,20 @@ export function ChatInterface({
         <div className="flex w-2/5 flex-col gap-6">
           {/* Top Left: Content Overview + Preview Panel */}
           <div className="flex h-1/2 flex-col space-y-4 overflow-y-auto">
-            <ContentOverview content={draftContent} />
+            <ContentOverview
+              content={draftContent}
+              pendingChanges={previewChanges}
+              onStartEdit={handleStartEdit}
+              editingField={editingField}
+              onSaveEdit={handleSaveEdit}
+              onCancelEdit={handleCancelEdit}
+            />
 
             <PreviewPanel
               draftContent={draftContent}
               changes={previewChanges}
+              onDiscardChange={handleDiscardChange}
+              onDiscardAll={handleDiscardAll}
             />
 
             <PublishingStatus
