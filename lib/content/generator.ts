@@ -222,12 +222,6 @@ export function generateHtmlFromContent(
       return;
     }
 
-    if (!element) {
-      element = document.createElement(tagName);
-      element.id = section.id;
-      document.body.appendChild(element);
-    }
-
     updateSectionElement(element, section);
   });
 
