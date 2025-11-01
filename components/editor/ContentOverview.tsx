@@ -1,7 +1,55 @@
 "use client";
 
 import { useState } from "react";
-import { WebsiteContent, PreviewChange } from "@/types/content";
+import { WebsiteContent, PreviewChange, SectionType } from "@/types/content";
+
+const SECTION_TYPE_VALUES: SectionType[] = [
+  "hero",
+  "content",
+  "list",
+  "contact",
+  "navigation",
+  "footer",
+  "article",
+  "sidebar",
+  "main",
+  "orphan",
+  "custom",
+];
+
+const SECTION_TYPE_ICONS: Record<SectionType, string> = {
+  hero: "🎯",
+  content: "📄",
+  list: "📋",
+  contact: "📧",
+  navigation: "🧭",
+  footer: "⬇️",
+  article: "📰",
+  sidebar: "📌",
+  main: "📦",
+  orphan: "🔍",
+  custom: "✨",
+};
+
+const SECTION_TYPE_LABELS: Record<SectionType, string> = {
+  hero: "Hero",
+  content: "Content",
+  list: "List",
+  contact: "Contact",
+  navigation: "Navigation",
+  footer: "Footer",
+  article: "Article",
+  sidebar: "Sidebar",
+  main: "Main",
+  orphan: "Other",
+  custom: "Custom",
+};
+
+function resolveSectionType(type: string): SectionType {
+  return SECTION_TYPE_VALUES.includes(type as SectionType)
+    ? (type as SectionType)
+    : "custom";
+}
 import {
   inferFieldMetadata,
   shouldUseModalEditor,
@@ -44,7 +92,6 @@ export function ContentOverview({
       (change) => change.sectionId === sectionId && change.field === field
     );
   };
-
 
   if (!content || !content.sections) {
     return (
@@ -106,6 +153,9 @@ export function ContentOverview({
           {sectionsArray.map((section) => {
             const isExpanded = expandedSections.has(section.id);
             const contentEntries = Object.entries(section.content);
+            const resolvedType = resolveSectionType(section.type);
+            const sectionIcon = SECTION_TYPE_ICONS[resolvedType];
+            const sectionTypeLabel = SECTION_TYPE_LABELS[resolvedType];
 
             return (
               <div key={section.id}>
@@ -125,8 +175,11 @@ export function ContentOverview({
                         ({contentEntries.length} fields)
                       </span>
                     </div>
-                    <span className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">
-                      {section.type}
+                    <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">
+                      <span role="img" aria-hidden="true">
+                        {sectionIcon}
+                      </span>
+                      {sectionTypeLabel}
                     </span>
                   </div>
                 </button>
