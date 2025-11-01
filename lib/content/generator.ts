@@ -119,11 +119,11 @@ export function generateHtmlFromContent(
   const dom = new JSDOM(html);
   const { document } = dom.window;
 
-  if (content.metadata.title) {
+  if (content.metadata?.title) {
     document.title = content.metadata.title;
   }
 
-  if (content.metadata.description) {
+  if (content.metadata?.description) {
     let description = document.querySelector('meta[name="description"]');
     if (!description) {
       description = document.createElement("meta");
