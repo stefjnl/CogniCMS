@@ -6,9 +6,12 @@ import { AuthError } from "@/lib/utils/errors";
 const SESSION_COOKIE = "cognicms_session";
 const SESSION_DURATION_HOURS = Number(process.env.SESSION_DURATION ?? 24);
 
+export type UserTier = "free" | "pro" | "enterprise";
+
 export interface AuthSession {
   sub: string;
   createdAt: string;
+  tier: UserTier;
 }
 
 function getSecretKey(): Uint8Array {
@@ -22,7 +25,11 @@ function getSecretKey(): Uint8Array {
 export async function createSessionResponse(): Promise<NextResponse> {
   const now = Math.floor(Date.now() / 1000);
   const exp = now + SESSION_DURATION_HOURS * 60 * 60;
-  const token = await new SignJWT({ createdAt: new Date().toISOString() })
+  const tier = (process.env.CMS_USER_TIER || "free") as UserTier;
+  const token = await new SignJWT({
+    createdAt: new Date().toISOString(),
+    tier,
+  })
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setSubject("cognicms-user")
     .setExpirationTime(exp)
@@ -62,9 +69,11 @@ export async function getSession(): Promise<AuthSession | null> {
   }
   try {
     const { payload } = await jwtVerify(token, getSecretKey());
+    const tier = (payload.tier as UserTier) || "free";
     return {
       sub: typeof payload.sub === "string" ? payload.sub : "cognicms-user",
       createdAt: String(payload.createdAt ?? ""),
+      tier,
     };
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {

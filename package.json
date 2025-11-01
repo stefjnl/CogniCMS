@@ -18,6 +18,8 @@
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-slot": "^1.2.3",
     "@sentry/nextjs": "^10.22.0",
+    "@upstash/ratelimit": "^2.0.6",
+    "@upstash/redis": "^1.35.6",
     "ai": "^5.0.85",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",

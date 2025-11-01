@@ -1,9 +1,10 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { executeChat } from "@/lib/ai/assistant";
 import type { ChatRequestBody } from "@/lib/ai/assistant";
 import { requireSession } from "@/lib/utils/auth";
 import { chatMessageSchema } from "@/lib/utils/validation";
+import { withRateLimit, addRateLimitHeaders } from "@/lib/utils/ratelimit";
 
 // Note: Uses Node.js runtime due to crypto.randomUUID and file-based storage
 // To enable Edge Runtime: migrate to database storage and use Web Crypto API
@@ -14,13 +15,26 @@ export async function POST(
   context: { params: Promise<{ siteId: string }> }
 ) {
   const { siteId } = await context.params;
+
+  // Get session first to extract tier for rate limiting
+  let session;
   try {
-    await requireSession();
+    session = await requireSession();
   } catch {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
     });
+  }
+
+  // Rate limiting: Tier-based limits for chat (AI operations are expensive)
+  // Free: 10/min, Pro: 50/min, Enterprise: 200/min
+  const rateLimitResult = await withRateLimit(request, {
+    type: "chat",
+    tier: session.tier,
+  });
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response;
   }
 
   const traceId = request.headers.get("x-trace-id") ?? randomUUID();
@@ -37,10 +51,16 @@ export async function POST(
     messageId,
   });
 
-  return result.toUIMessageStreamResponse({
+  const response = result.toUIMessageStreamResponse({
     headers: {
       "X-Trace-Id": traceId,
+      // Add rate limit headers to streaming response
+      "X-RateLimit-Limit": rateLimitResult.result.limit.toString(),
+      "X-RateLimit-Remaining": rateLimitResult.result.remaining.toString(),
+      "X-RateLimit-Reset": rateLimitResult.result.reset.toString(),
     },
     originalMessages: parsed.messages ?? [],
   });
+
+  return response;
 }

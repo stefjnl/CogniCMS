@@ -16,6 +16,7 @@ import { requireSession } from "@/lib/utils/auth";
 import { publishSchema } from "@/lib/utils/validation";
 import { WebsiteContent } from "@/types/content";
 import { JSDOM } from "jsdom";
+import { withRateLimit, addRateLimitHeaders } from "@/lib/utils/ratelimit";
 
 // Note: Uses Node.js runtime due to HTML highlight stripping with JSDOM
 // Consider migrating to Edge Runtime with linkedom for better performance
@@ -31,12 +32,24 @@ export async function POST(
 ) {
   console.log("[PUBLISH_API] Starting publish request");
 
+  // Get session first to extract tier for rate limiting
+  let session;
   try {
-    await requireSession();
+    session = await requireSession();
     console.log("[PUBLISH_API] Session authenticated");
   } catch {
     console.log("[PUBLISH_API] Session authentication failed");
     return authError();
+  }
+
+  // Rate limiting: Tier-based limits for publish (GitHub API)
+  // Free: 5/min, Pro: 25/min, Enterprise: 100/min
+  const rateLimitResult = await withRateLimit(request, {
+    type: "publish",
+    tier: session.tier,
+  });
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response;
   }
 
   const { siteId } = await context.params;
@@ -271,8 +284,10 @@ export async function POST(
   clearDraftContent(siteId);
   console.log("[PUBLISH_API] Draft cleared");
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     ...result,
     diff: draft ? diffWebsiteContent(draft, content) : [],
   });
+
+  return addRateLimitHeaders(response, rateLimitResult.result);
 }

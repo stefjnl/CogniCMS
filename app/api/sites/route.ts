@@ -8,16 +8,38 @@ import {
   sanitizeError,
   logError,
 } from "@/lib/utils/errors";
+import { withRateLimit, addRateLimitHeaders } from "@/lib/utils/ratelimit";
 
 // Note: Uses Node.js runtime due to file-based storage (fs, path, crypto)
 // To enable Edge Runtime: migrate to database storage (e.g., Vercel KV, Postgres)
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  let session;
   try {
-    await requireSession();
+    session = await requireSession();
+  } catch (error) {
+    logError(error, { route: "/api/sites", method: "GET" });
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    throw error;
+  }
+
+  // Rate limiting: Tier-based limits for sites API
+  // Free: 30/min, Pro: 150/min, Enterprise: 600/min
+  const rateLimitResult = await withRateLimit(request, {
+    type: "sites",
+    tier: session.tier,
+  });
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response;
+  }
+
+  try {
     const sites = await listSites();
-    return NextResponse.json({ sites });
+    const response = NextResponse.json({ sites });
+    return addRateLimitHeaders(response, rateLimitResult.result);
   } catch (error) {
     logError(error, { route: "/api/sites", method: "GET" });
 
@@ -34,12 +56,33 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  let session;
   try {
-    await requireSession();
+    session = await requireSession();
+  } catch (error) {
+    logError(error, { route: "/api/sites", method: "POST" });
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    throw error;
+  }
+
+  // Rate limiting: Tier-based limits for sites API
+  // Free: 30/min, Pro: 150/min, Enterprise: 600/min
+  const rateLimitResult = await withRateLimit(request, {
+    type: "sites",
+    tier: session.tier,
+  });
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response;
+  }
+
+  try {
     const body = await request.json();
     const parsed = siteSchema.parse(body);
     const site = await createSite(parsed);
-    return NextResponse.json({ site }, { status: 201 });
+    const response = NextResponse.json({ site }, { status: 201 });
+    return addRateLimitHeaders(response, rateLimitResult.result);
   } catch (error) {
     logError(error, { route: "/api/sites", method: "POST" });
 

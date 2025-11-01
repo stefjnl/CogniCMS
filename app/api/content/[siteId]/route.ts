@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/utils/auth";
 import { getDraftContent, setDraftContent } from "@/lib/storage/cache";
 import { getFileContent } from "@/lib/github/operations";
 import { WebsiteContent } from "@/types/content";
+import { withRateLimit, addRateLimitHeaders } from "@/lib/utils/ratelimit";
 
 // Note: Uses Node.js runtime due to HTML extraction with JSDOM
 // Consider migrating to Edge Runtime with linkedom or other Edge-compatible parser
@@ -11,20 +12,29 @@ export const runtime = "nodejs";
 
 async function ensureAuth() {
   try {
-    await requireSession();
-    return true;
+    return await requireSession();
   } catch {
-    return false;
+    return null;
   }
 }
 
 export async function GET(
-  _: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ siteId: string }> }
 ) {
-  const authed = await ensureAuth();
-  if (!authed) {
+  const session = await ensureAuth();
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limiting: Tier-based limits for content API
+  // Free: 60/min, Pro: 300/min, Enterprise: 1200/min
+  const rateLimitResult = await withRateLimit(request, {
+    type: "default",
+    tier: session.tier,
+  });
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response;
   }
 
   const { siteId } = await context.params;
@@ -47,23 +57,30 @@ export async function GET(
       const extractedDate = new Date(extractedContent.metadata.lastModified);
 
       if (draftDate > extractedDate) {
-        return NextResponse.json({ content: draft, draft: true });
+        const response = NextResponse.json({ content: draft, draft: true });
+        return addRateLimitHeaders(response, rateLimitResult.result);
       }
     }
 
     setDraftContent(site.id, extractedContent);
-    return NextResponse.json({ content: extractedContent, draft: false });
+    const response = NextResponse.json({
+      content: extractedContent,
+      draft: false,
+    });
+    return addRateLimitHeaders(response, rateLimitResult.result);
   } catch (error) {
     // Fallback to existing content.json if extraction fails
     const draft = getDraftContent(siteId);
     if (draft) {
-      return NextResponse.json({ content: draft, draft: true });
+      const response = NextResponse.json({ content: draft, draft: true });
+      return addRateLimitHeaders(response, rateLimitResult.result);
     }
 
     const file = await getFileContent(site, site.contentFile);
     const content = JSON.parse(file.content) as WebsiteContent;
     setDraftContent(site.id, content);
-    return NextResponse.json({ content, draft: false });
+    const response = NextResponse.json({ content, draft: false });
+    return addRateLimitHeaders(response, rateLimitResult.result);
   }
 }
 
@@ -71,13 +88,24 @@ export async function PUT(
   request: NextRequest,
   context: { params: Promise<{ siteId: string }> }
 ) {
-  const authed = await ensureAuth();
-  if (!authed) {
+  const session = await ensureAuth();
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limiting: Tier-based limits for content API
+  // Free: 60/min, Pro: 300/min, Enterprise: 1200/min
+  const rateLimitResult = await withRateLimit(request, {
+    type: "default",
+    tier: session.tier,
+  });
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response;
   }
 
   const body = await request.json();
   const { siteId } = await context.params;
   setDraftContent(siteId, body as WebsiteContent);
-  return NextResponse.json({ success: true });
+  const response = NextResponse.json({ success: true });
+  return addRateLimitHeaders(response, rateLimitResult.result);
 }

@@ -8,17 +8,38 @@ import {
   sanitizeError,
   logError,
 } from "@/lib/utils/errors";
+import { withRateLimit, addRateLimitHeaders } from "@/lib/utils/ratelimit";
 
 // Note: Uses Node.js runtime due to file-based storage (fs, path, crypto)
 // To enable Edge Runtime: migrate to database storage (e.g., Vercel KV, Postgres)
 export const runtime = "nodejs";
 
 export async function GET(
-  _: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ siteId: string }> }
 ) {
+  let session;
   try {
-    await requireSession();
+    session = await requireSession();
+  } catch (error) {
+    logError(error, { route: "/api/sites/[siteId]", method: "GET" });
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    throw error;
+  }
+
+  // Rate limiting: Tier-based limits for sites API
+  // Free: 30/min, Pro: 150/min, Enterprise: 600/min
+  const rateLimitResult = await withRateLimit(request, {
+    type: "sites",
+    tier: session.tier,
+  });
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response;
+  }
+
+  try {
     const { siteId } = await context.params;
     const site = await getSiteConfig(siteId);
 
@@ -26,7 +47,8 @@ export async function GET(
       throw new NotFoundError("Site");
     }
 
-    return NextResponse.json({ site });
+    const response = NextResponse.json({ site });
+    return addRateLimitHeaders(response, rateLimitResult.result);
   } catch (error) {
     logError(error, { route: "/api/sites/[siteId]", method: "GET" });
 
@@ -46,8 +68,28 @@ export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ siteId: string }> }
 ) {
+  let session;
   try {
-    await requireSession();
+    session = await requireSession();
+  } catch (error) {
+    logError(error, { route: "/api/sites/[siteId]", method: "PATCH" });
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    throw error;
+  }
+
+  // Rate limiting: Tier-based limits for sites API
+  // Free: 30/min, Pro: 150/min, Enterprise: 600/min
+  const rateLimitResult = await withRateLimit(request, {
+    type: "sites",
+    tier: session.tier,
+  });
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response;
+  }
+
+  try {
     const body = await request.json();
     const parsed = siteSchema.partial().parse(body);
     const { siteId } = await context.params;
@@ -57,7 +99,8 @@ export async function PATCH(
       throw new NotFoundError("Site");
     }
 
-    return NextResponse.json({ site });
+    const response = NextResponse.json({ site });
+    return addRateLimitHeaders(response, rateLimitResult.result);
   } catch (error) {
     logError(error, { route: "/api/sites/[siteId]", method: "PATCH" });
 
@@ -87,11 +130,31 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ siteId: string }> }
 ) {
+  let session;
   try {
-    await requireSession();
+    session = await requireSession();
+  } catch (error) {
+    logError(error, { route: "/api/sites/[siteId]", method: "DELETE" });
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    throw error;
+  }
+
+  // Rate limiting: Tier-based limits for sites API
+  // Free: 30/min, Pro: 150/min, Enterprise: 600/min
+  const rateLimitResult = await withRateLimit(request, {
+    type: "sites",
+    tier: session.tier,
+  });
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response;
+  }
+
+  try {
     const { siteId } = await context.params;
 
     // Check if site exists before deleting
@@ -101,7 +164,8 @@ export async function DELETE(
     }
 
     await deleteSite(siteId);
-    return NextResponse.json({ success: true });
+    const response = NextResponse.json({ success: true });
+    return addRateLimitHeaders(response, rateLimitResult.result);
   } catch (error) {
     logError(error, { route: "/api/sites/[siteId]", method: "DELETE" });
 
