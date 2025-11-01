@@ -3,6 +3,10 @@ import { deleteSite, getSiteConfig, updateSite } from "@/lib/storage/sites";
 import { requireSession } from "@/lib/utils/auth";
 import { siteSchema } from "@/lib/utils/validation";
 
+// Note: Uses Node.js runtime due to file-based storage (fs, path, crypto)
+// To enable Edge Runtime: migrate to database storage (e.g., Vercel KV, Postgres)
+export const runtime = "nodejs";
+
 function authError() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }

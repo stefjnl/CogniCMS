@@ -5,6 +5,10 @@ import { getSiteConfig } from "@/lib/storage/sites";
 import { setDraftContent } from "@/lib/storage/cache";
 import { requireSession } from "@/lib/utils/auth";
 
+// Note: Uses Node.js runtime due to HTML extraction with JSDOM
+// Consider migrating to Edge Runtime with linkedom or other Edge-compatible parser
+export const runtime = "nodejs";
+
 function authError() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }

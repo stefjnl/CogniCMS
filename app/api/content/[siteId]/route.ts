@@ -5,6 +5,10 @@ import { getDraftContent, setDraftContent } from "@/lib/storage/cache";
 import { getFileContent } from "@/lib/github/operations";
 import { WebsiteContent } from "@/types/content";
 
+// Note: Uses Node.js runtime due to HTML extraction with JSDOM
+// Consider migrating to Edge Runtime with linkedom or other Edge-compatible parser
+export const runtime = "nodejs";
+
 async function ensureAuth() {
   try {
     await requireSession();
@@ -35,18 +39,18 @@ export async function GET(
     const htmlFile = await getFileContent(site, site.htmlFile);
     const { extractContentFromHtml } = await import("@/lib/content/extractor");
     const extractedContent = extractContentFromHtml(htmlFile.content);
-    
+
     // Check if there's a draft with more recent modifications
     const draft = getDraftContent(siteId);
     if (draft && draft.metadata && draft.metadata.lastModified) {
       const draftDate = new Date(draft.metadata.lastModified);
       const extractedDate = new Date(extractedContent.metadata.lastModified);
-      
+
       if (draftDate > extractedDate) {
         return NextResponse.json({ content: draft, draft: true });
       }
     }
-    
+
     setDraftContent(site.id, extractedContent);
     return NextResponse.json({ content: extractedContent, draft: false });
   } catch (error) {

@@ -5,6 +5,9 @@ import {
   verifyPassword,
 } from "@/lib/utils/auth";
 
+// Use Edge Runtime for faster cold starts and lower latency
+export const runtime = "edge";
+
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const password = body?.password;

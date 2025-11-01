@@ -5,6 +5,10 @@ import type { ChatRequestBody } from "@/lib/ai/assistant";
 import { requireSession } from "@/lib/utils/auth";
 import { chatMessageSchema } from "@/lib/utils/validation";
 
+// Note: Uses Node.js runtime due to crypto.randomUUID and file-based storage
+// To enable Edge Runtime: migrate to database storage and use Web Crypto API
+export const runtime = "nodejs";
+
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ siteId: string }> }

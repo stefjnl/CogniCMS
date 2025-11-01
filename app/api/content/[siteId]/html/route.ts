@@ -3,6 +3,10 @@ import { requireSession } from "@/lib/utils/auth";
 import { getSiteConfig } from "@/lib/storage/sites";
 import { getFileContent } from "@/lib/github/operations";
 
+// Note: Uses Node.js runtime due to file-based storage dependencies
+// To enable Edge Runtime: migrate to database storage
+export const runtime = "nodejs";
+
 function authError() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }

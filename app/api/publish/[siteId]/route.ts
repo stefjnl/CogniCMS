@@ -15,7 +15,11 @@ import { generateHtmlFromContent } from "@/lib/content/generator";
 import { requireSession } from "@/lib/utils/auth";
 import { publishSchema } from "@/lib/utils/validation";
 import { WebsiteContent } from "@/types/content";
-import { JSDOM } from 'jsdom';
+import { JSDOM } from "jsdom";
+
+// Note: Uses Node.js runtime due to HTML highlight stripping with JSDOM
+// Consider migrating to Edge Runtime with linkedom for better performance
+export const runtime = "nodejs";
 
 function authError() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -53,16 +57,32 @@ export async function POST(
     console.log("[PUBLISH_API] Has content:", !!body.content);
     console.log("[PUBLISH_API] Has html:", !!body.html);
     console.log("[PUBLISH_API] Commit message:", body.commitMessage);
-    
+
     // Log HTML details if present
     if (body.html) {
-      console.log("[PUBLISH_API] Received HTML length:", body.html?.length || 0);
-      console.log("[PUBLISH_API] Received HTML checksum:", body.html?.length.toString() + '_' + body.html?.substring(0, 50).replace(/\s/g, ''));
-      console.log("[PUBLISH_API] Received HTML preview:", body.html?.substring(0, 200) + "...");
-      
+      console.log(
+        "[PUBLISH_API] Received HTML length:",
+        body.html?.length || 0
+      );
+      console.log(
+        "[PUBLISH_API] Received HTML checksum:",
+        body.html?.length.toString() +
+          "_" +
+          body.html?.substring(0, 50).replace(/\s/g, "")
+      );
+      console.log(
+        "[PUBLISH_API] Received HTML preview:",
+        body.html?.substring(0, 200) + "..."
+      );
+
       // Check for change highlights
-      const hasHighlights = body.html.includes('cognicms-changed') || body.html.includes('data-cognicms-change-id');
-      console.log("[PUBLISH_API] Received HTML contains change highlights:", hasHighlights);
+      const hasHighlights =
+        body.html.includes("cognicms-changed") ||
+        body.html.includes("data-cognicms-change-id");
+      console.log(
+        "[PUBLISH_API] Received HTML contains change highlights:",
+        hasHighlights
+      );
     }
   } catch (error) {
     console.error("[PUBLISH_API] Failed to parse request body:", error);
@@ -104,55 +124,81 @@ export async function POST(
     if (parsed.html) {
       // Use the provided HTML directly (it already has the changes applied)
       finalHtml = parsed.html;
-      
+
       // DEBUG LOGGING: Track HTML details
       console.log(
         "[PUBLISH_API] Using provided HTML with changes applied, length:",
         finalHtml.length
       );
-      console.log("[PUBLISH_API] HTML preview (first 200 chars):", finalHtml.substring(0, 200) + "...");
-      
+      console.log(
+        "[PUBLISH_API] HTML preview (first 200 chars):",
+        finalHtml.substring(0, 200) + "..."
+      );
+
       // Check if this looks like the updated HTML by looking for change highlights
-      const hasChangeHighlights = finalHtml.includes('cognicms-changed') || finalHtml.includes('data-cognicms-change-id');
-      console.log("[PUBLISH_API] HTML contains change highlights:", hasChangeHighlights);
-      
+      const hasChangeHighlights =
+        finalHtml.includes("cognicms-changed") ||
+        finalHtml.includes("data-cognicms-change-id");
+      console.log(
+        "[PUBLISH_API] HTML contains change highlights:",
+        hasChangeHighlights
+      );
+
       // Log a checksum to help identify if it's the right HTML
-      const simpleChecksum = finalHtml.length.toString() + '_' + finalHtml.substring(0, 50).replace(/\s/g, '');
+      const simpleChecksum =
+        finalHtml.length.toString() +
+        "_" +
+        finalHtml.substring(0, 50).replace(/\s/g, "");
       console.log("[PUBLISH_API] HTML checksum for debugging:", simpleChecksum);
-      
+
       // CRITICAL: Strip change highlights before publishing to GitHub
       // The highlighted HTML is only for preview, not for publishing
       if (hasChangeHighlights) {
-        console.log("[PUBLISH_API] Stripping change highlights before publishing...");
+        console.log(
+          "[PUBLISH_API] Stripping change highlights before publishing..."
+        );
         const dom = new JSDOM(finalHtml);
         const { document } = dom.window;
-        
+
         // Remove highlight styles
-        const highlightStyles = document.querySelector('style[data-cognicms-highlight]');
+        const highlightStyles = document.querySelector(
+          "style[data-cognicms-highlight]"
+        );
         if (highlightStyles) {
           highlightStyles.remove();
         } else {
           // Try to find style containing cognicms-changed
-          const allStyles = document.querySelectorAll('style');
-          allStyles.forEach(style => {
-            if (style.textContent && style.textContent.includes('cognicms-changed')) {
+          const allStyles = document.querySelectorAll("style");
+          allStyles.forEach((style) => {
+            if (
+              style.textContent &&
+              style.textContent.includes("cognicms-changed")
+            ) {
               style.remove();
             }
           });
         }
-        
+
         // Remove highlight classes and attributes
-        const changedElements = document.querySelectorAll('.cognicms-changed');
-        changedElements.forEach(element => {
-          element.classList.remove('cognicms-changed');
-          element.removeAttribute('data-cognicms-change-id');
+        const changedElements = document.querySelectorAll(".cognicms-changed");
+        changedElements.forEach((element) => {
+          element.classList.remove("cognicms-changed");
+          element.removeAttribute("data-cognicms-change-id");
         });
-        
+
         // Serialize back to HTML
         const cleanedHtml = dom.serialize();
-        console.log("[PUBLISH_API] HTML after stripping highlights length:", cleanedHtml.length);
-        console.log("[PUBLISH_API] Cleaned HTML checksum:", cleanedHtml.length.toString() + '_' + cleanedHtml.substring(0, 50).replace(/\s/g, ''));
-        
+        console.log(
+          "[PUBLISH_API] HTML after stripping highlights length:",
+          cleanedHtml.length
+        );
+        console.log(
+          "[PUBLISH_API] Cleaned HTML checksum:",
+          cleanedHtml.length.toString() +
+            "_" +
+            cleanedHtml.substring(0, 50).replace(/\s/g, "")
+        );
+
         finalHtml = cleanedHtml;
       }
     } else {
