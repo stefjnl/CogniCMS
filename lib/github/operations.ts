@@ -207,7 +207,6 @@ export async function publishFiles(
   
   try {
     const token = await resolveToken(site);
-    console.log("[PUBLISH_FILES] Token resolved successfully, length:", token?.length || 0);
     if (!token) {
       throw new Error("Failed to resolve GitHub token - token is null or empty");
     }
