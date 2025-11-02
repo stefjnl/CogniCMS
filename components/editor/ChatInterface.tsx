@@ -181,8 +181,16 @@ export function ChatInterface({
       const nextContent = body.content as WebsiteContent;
       setDraftContent(nextContent);
       const changes = diffAgainstBaseline(nextContent);
-      setPreviewChanges(changes);
-      const nextCommit = buildCommitMessage(changes);
+
+      // Attribute changes to AI source (fixes AI editing preview issue)
+      const attributedChanges = changes.map((change) => ({
+        ...change,
+        source: "ai" as const,
+        timestamp: new Date().toISOString(),
+      }));
+
+      setPreviewChanges(attributedChanges);
+      const nextCommit = buildCommitMessage(attributedChanges);
       setCommitMessage(nextCommit);
       // statusMessage is now managed by the publish hook, so we skip that
       // preview updates are now automatic via the effect
@@ -230,6 +238,54 @@ export function ChatInterface({
     setClientError(null);
     await executePublish();
   }, [executePublish]);
+
+  // Re-scan HTML to extract fresh content
+  const handleRescan = useCallback(async () => {
+    try {
+      console.log("[RESCAN] Starting HTML re-extraction...");
+
+      // Call the extract endpoint
+      const response = await fetch(`/api/content/${site.id}/extract`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Trace-Id": crypto.randomUUID(),
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Extract failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log("[RESCAN] Extraction complete, fetching updated content...");
+
+      // Fetch the updated content
+      const contentResponse = await fetch(`/api/content/${site.id}`, {
+        headers: {
+          "X-Trace-Id": crypto.randomUUID(),
+        },
+      });
+
+      if (!contentResponse.ok) {
+        throw new Error(`Content fetch failed: ${contentResponse.statusText}`);
+      }
+
+      const { content } = await contentResponse.json();
+      console.log("[RESCAN] Content updated, sections count:", content.sections.length);
+
+      // Update the UI state
+      setDraftContent(content);
+      baselineRef.current = content;
+      setPreviewChanges([]);
+      setCommitMessage("[CogniCMS] Content update");
+
+      alert(`✅ Re-scan complete! Found ${content.sections.length} sections.`);
+    } catch (error) {
+      console.error("[RESCAN] Error:", error);
+      setClientError(`Re-scan failed: ${(error as Error).message}`);
+    }
+  }, [site.id]);
 
   // Manual editing handlers
   const handleStartEdit = useCallback(
@@ -501,7 +557,7 @@ export function ChatInterface({
   return (
     <div className="flex h-screen flex-col">
       <div className="flex-shrink-0 border-b border-slate-200 bg-white p-6">
-        <SiteHeader site={site} lastSynced={lastModified} />
+        <SiteHeader site={site} lastSynced={lastModified} onRescan={handleRescan} />
         <div className="mt-4">
           <StatusBar
             gitHubConnected={true}
