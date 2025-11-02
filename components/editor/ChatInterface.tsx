@@ -472,10 +472,23 @@ export function ChatInterface({
 
         // Recompute changes
         const changes = diffAgainstBaseline(revertedContent);
-        setPreviewChanges(changes);
+
+        // Preserve source attribution from existing changes where possible
+        const attributedChanges = changes.map((change) => {
+          const existing = previewChanges.find(
+            (c) => c.sectionId === change.sectionId && c.field === change.field
+          );
+          return {
+            ...change,
+            source: existing?.source || ("ai" as const),
+            timestamp: existing?.timestamp || new Date().toISOString(),
+          };
+        });
+
+        setPreviewChanges(attributedChanges);
 
         // Update commit message
-        const nextCommit = buildCommitMessage(changes);
+        const nextCommit = buildCommitMessage(attributedChanges);
         setCommitMessage(nextCommit);
 
         // Update publish state
