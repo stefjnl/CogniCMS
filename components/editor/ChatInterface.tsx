@@ -616,7 +616,7 @@ export function ChatInterface({
         <div className="mt-4">
           <StatusBar
             gitHubConnected={true}
-            aiModel="GPT-OSS-120B"
+            aiModel="z-ai/glm-4.6"
             unpublishedChanges={previewChanges.length}
           />
         </div>
