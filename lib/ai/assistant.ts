@@ -87,7 +87,10 @@ export async function executeChat(
         typedActions
       );
       workingDraft = nextContent;
-      setDraftContent(context.siteId, nextContent);
+      setDraftContent(context.siteId, nextContent, {
+        traceId: context.traceId,
+        source: "chat-executor",
+      });
       logger("draft-updated", {
         actionCount: typedActions.length,
         changeCount: changes.length,

@@ -99,7 +99,9 @@ export async function updateDraftContentAction(
   }
 
   try {
-    setDraftContent(siteId, content);
+    setDraftContent(siteId, content, {
+      source: "actions:updateDraftContent",
+    });
     return {
       success: true,
     };

@@ -1,59 +1,151 @@
 import { PreviewChange } from "@/types/content";
 import { JSDOM } from "jsdom";
 
+function applyMetadataChange(
+  document: Document,
+  change: PreviewChange
+): boolean {
+  if (change.sectionId !== "metadata") {
+    return false;
+  }
+
+  if (typeof change.proposedValue !== "string") {
+    return true;
+  }
+
+  const value = change.proposedValue;
+
+  if (change.field === "title") {
+    let titleEl = document.querySelector("title");
+    if (!titleEl) {
+      titleEl = document.createElement("title");
+      document.head?.appendChild(titleEl);
+    }
+    if (titleEl) {
+      titleEl.textContent = value;
+    }
+
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle) {
+      ogTitle.setAttribute("content", value);
+    }
+
+    const twitterTitle = document.querySelector('meta[name="twitter:title"]');
+    if (twitterTitle) {
+      twitterTitle.setAttribute("content", value);
+    }
+
+    return true;
+  }
+
+  if (change.field === "description") {
+    let metaDescription = document.querySelector('meta[name="description"]');
+    if (!metaDescription) {
+      metaDescription = document.createElement("meta");
+      metaDescription.setAttribute("name", "description");
+      document.head?.appendChild(metaDescription);
+    }
+    if (metaDescription) {
+      metaDescription.setAttribute("content", value);
+    }
+
+    const ogDescription = document.querySelector(
+      'meta[property="og:description"]'
+    );
+    if (ogDescription) {
+      ogDescription.setAttribute("content", value);
+    }
+
+    const twitterDescription = document.querySelector(
+      'meta[name="twitter:description"]'
+    );
+    if (twitterDescription) {
+      twitterDescription.setAttribute("content", value);
+    }
+
+    return true;
+  }
+
+  if (change.field === "lastModified") {
+    const metaUpdated = document.querySelector(
+      'meta[property="article:modified_time"]'
+    );
+    if (metaUpdated) {
+      metaUpdated.setAttribute("content", value);
+      return true;
+    }
+  }
+
+  return true;
+}
+
 /**
  * Get the actual selector for a section change
  * This function tries multiple strategies to find the right element
  */
-export function getSelectorForChange(change: PreviewChange, sections?: any[]): string {
+export function getSelectorForChange(
+  change: PreviewChange,
+  sections?: any[]
+): string {
   const selectors = [];
-  
+
   // If we have sections data, try to find the matching section and use its selector
   if (sections) {
-    const matchingSection = sections.find(section => section.id === change.sectionId);
+    const matchingSection = sections.find(
+      (section) => section.id === change.sectionId
+    );
     if (matchingSection && matchingSection.selector) {
       selectors.push(matchingSection.selector);
     }
   }
-  
+
   // Strategy 1: Try ID matching section ID
   selectors.push(`#${change.sectionId}`);
-  
+
   // Strategy 2: Try data attribute matching section ID
   selectors.push(`[data-section="${change.sectionId}"]`);
   selectors.push(`[data-section-id="${change.sectionId}"]`);
-  
+
   // Strategy 3: Try class matching section ID
   selectors.push(`.${change.sectionId}`);
-  
+
   // Strategy 4: Try semantic elements based on section ID
   const sectionId = change.sectionId.toLowerCase();
-  if (sectionId === 'header') {
-    selectors.push('header');
-  } else if (sectionId === 'footer') {
-    selectors.push('footer');
-  } else if (sectionId === 'nav' || sectionId === 'navigation') {
-    selectors.push('nav');
-  } else if (sectionId === 'main') {
-    selectors.push('main');
-  } else if (sectionId === 'aside') {
-    selectors.push('aside');
-  } else if (sectionId === 'article') {
-    selectors.push('article');
-  } else if (sectionId === 'section') {
-    selectors.push('section');
+  if (sectionId === "header") {
+    selectors.push("header");
+  } else if (sectionId === "footer") {
+    selectors.push("footer");
+  } else if (sectionId === "nav" || sectionId === "navigation") {
+    selectors.push("nav");
+  } else if (sectionId === "main") {
+    selectors.push("main");
+  } else if (sectionId === "aside") {
+    selectors.push("aside");
+  } else if (sectionId === "article") {
+    selectors.push("article");
+  } else if (sectionId === "section") {
+    selectors.push("section");
   }
-  
+
   // Strategy 5: Try elements with specific IDs that might contain the content
   // Based on the known IDs in the HTML
-  const knownIds = ['newsletter', 'newsletterForm', 'newsletterFeedback', 'copyEmailBtn', 'backToTop', 'privacyModal', 'privacyClose', 'copyFeedback'];
+  const knownIds = [
+    "newsletter",
+    "newsletterForm",
+    "newsletterFeedback",
+    "copyEmailBtn",
+    "backToTop",
+    "privacyModal",
+    "privacyClose",
+    "copyFeedback",
+  ];
   if (knownIds.includes(change.sectionId)) {
     selectors.push(`#${change.sectionId}`);
   }
-  
+
   // Return all selectors as a comma-separated list
   // The applyChangesToHTML will use querySelector which will try them in order
-  return selectors.join(', ');
+  return selectors.join(", ");
 }
 
 /**
@@ -65,7 +157,10 @@ export function applyChangesToHTML(
   sections?: any[]
 ): string {
   console.log("[APPLY_CHANGES] Starting applyChangesToHTML");
-  console.log("[APPLY_CHANGES] Original HTML length:", originalHTML?.length || 0);
+  console.log(
+    "[APPLY_CHANGES] Original HTML length:",
+    originalHTML?.length || 0
+  );
   console.log("[APPLY_CHANGES] Number of changes:", changes?.length || 0);
   console.log("[APPLY_CHANGES] Changes:", JSON.stringify(changes, null, 2));
 
@@ -77,28 +172,61 @@ export function applyChangesToHTML(
   const dom = new JSDOM(originalHTML);
   const { document } = dom.window;
 
-  console.log("[APPLY_CHANGES] DOM created, document element:", document.documentElement?.tagName);
+  console.log(
+    "[APPLY_CHANGES] DOM created, document element:",
+    document.documentElement?.tagName
+  );
 
   for (const change of changes) {
     try {
-      console.log("[APPLY_CHANGES] Processing change:", change);
-      const selector = getSelectorForChange(change, sections);
-      console.log("[APPLY_CHANGES] Generated selector:", selector);
-      
-      const element = document.querySelector(selector);
-
-      if (!element) {
-        console.warn(`[APPLY_CHANGES] Element not found for selector: ${selector}`);
-        console.log("[APPLY_CHANGES] Available elements in document:");
-        console.log("[APPLY_CHANGES] All IDs:", Array.from(document.querySelectorAll('[id]')).map(el => el.id));
-        console.log("[APPLY_CHANGES] All data-section attributes:", Array.from(document.querySelectorAll('[data-section]')).map(el => el.getAttribute('data-section')));
-        console.log("[APPLY_CHANGES] All data-section-id attributes:", Array.from(document.querySelectorAll('[data-section-id]')).map(el => el.getAttribute('data-section-id')));
-        console.log("[APPLY_CHANGES] All classes:", Array.from(document.querySelectorAll('[class]')).map(el => el.className));
+      if (applyMetadataChange(document, change)) {
+        console.log("[APPLY_CHANGES] Metadata change applied:", change);
         continue;
       }
 
-      console.log("[APPLY_CHANGES] Found element:", element.tagName, element.id, element.className);
-      
+      console.log("[APPLY_CHANGES] Processing change:", change);
+      const selector = getSelectorForChange(change, sections);
+      console.log("[APPLY_CHANGES] Generated selector:", selector);
+
+      const element = document.querySelector(selector);
+
+      if (!element) {
+        console.warn(
+          `[APPLY_CHANGES] Element not found for selector: ${selector}`
+        );
+        console.log("[APPLY_CHANGES] Available elements in document:");
+        console.log(
+          "[APPLY_CHANGES] All IDs:",
+          Array.from(document.querySelectorAll("[id]")).map((el) => el.id)
+        );
+        console.log(
+          "[APPLY_CHANGES] All data-section attributes:",
+          Array.from(document.querySelectorAll("[data-section]")).map((el) =>
+            el.getAttribute("data-section")
+          )
+        );
+        console.log(
+          "[APPLY_CHANGES] All data-section-id attributes:",
+          Array.from(document.querySelectorAll("[data-section-id]")).map((el) =>
+            el.getAttribute("data-section-id")
+          )
+        );
+        console.log(
+          "[APPLY_CHANGES] All classes:",
+          Array.from(document.querySelectorAll("[class]")).map(
+            (el) => el.className
+          )
+        );
+        continue;
+      }
+
+      console.log(
+        "[APPLY_CHANGES] Found element:",
+        element.tagName,
+        element.id,
+        element.className
+      );
+
       // Apply the change based on the field type
       applyChangeToElement(element, change);
       console.log("[APPLY_CHANGES] Change applied successfully");
@@ -172,6 +300,10 @@ export function addChangeHighlights(
   // Add the class to changed elements
   for (const change of changes) {
     try {
+      if (change.sectionId === "metadata") {
+        continue;
+      }
+
       const selector = getSelectorForChange(change, sections);
       const element = document.querySelector(selector);
 
@@ -190,7 +322,6 @@ export function addChangeHighlights(
   return dom.serialize();
 }
 
-
 /**
  * Apply a change to a DOM element
  */
@@ -203,19 +334,25 @@ function applyChangeToElement(element: Element, change: PreviewChange): void {
     elementType: element.tagName,
     elementId: element.id,
     elementClass: element.className,
-    elementContent: element.textContent?.substring(0, 100)
+    elementContent: element.textContent?.substring(0, 100),
   });
 
   // Try multiple strategies to find and update the right element
 
   // Strategy 1: Look for element with data-field attribute
   let target = element.querySelector(`[data-field="${field}"]`);
-  console.log("[APPLY_CHANGE] Strategy 1 - data-field selector result:", target?.tagName);
+  console.log(
+    "[APPLY_CHANGE] Strategy 1 - data-field selector result:",
+    target?.tagName
+  );
 
   // Strategy 2: Look for element with data-section-field attribute
   if (!target) {
     target = element.querySelector(`[data-section-field="${field}"]`);
-    console.log("[APPLY_CHANGE] Strategy 2 - data-section-field selector result:", target?.tagName);
+    console.log(
+      "[APPLY_CHANGE] Strategy 2 - data-section-field selector result:",
+      target?.tagName
+    );
   }
 
   // Strategy 3: Field-specific mappings for common patterns
@@ -226,7 +363,10 @@ function applyChangeToElement(element: Element, change: PreviewChange): void {
       field.toLowerCase().includes("title")
     ) {
       target = element.querySelector("h1, h2, h3, h4, h5, h6");
-      console.log("[APPLY_CHANGE] Strategy 3a - heading selector result:", target?.tagName);
+      console.log(
+        "[APPLY_CHANGE] Strategy 3a - heading selector result:",
+        target?.tagName
+      );
     } else if (
       field === "text" ||
       field === "description" ||
@@ -237,22 +377,31 @@ function applyChangeToElement(element: Element, change: PreviewChange): void {
       // For text fields, try to find the most appropriate text element
       // First try paragraphs
       target = element.querySelector("p");
-      console.log("[APPLY_CHANGE] Strategy 3b - paragraph selector result:", target?.tagName);
-      
+      console.log(
+        "[APPLY_CHANGE] Strategy 3b - paragraph selector result:",
+        target?.tagName
+      );
+
       // If no paragraph, try buttons (for newsletter signup, etc.)
       if (!target) {
         target = element.querySelector("button");
-        console.log("[APPLY_CHANGE] Strategy 3b2 - button selector result:", target?.tagName);
+        console.log(
+          "[APPLY_CHANGE] Strategy 3b2 - button selector result:",
+          target?.tagName
+        );
       }
-      
+
       // If still no target, try spans or divs with text content
       if (!target) {
-        const textElements = Array.from(element.querySelectorAll("span, div")).filter(
-          el => el.textContent && el.textContent.trim().length > 0
-        );
+        const textElements = Array.from(
+          element.querySelectorAll("span, div")
+        ).filter((el) => el.textContent && el.textContent.trim().length > 0);
         if (textElements.length > 0) {
           target = textElements[0];
-          console.log("[APPLY_CHANGE] Strategy 3b3 - text element selector result:", target?.tagName);
+          console.log(
+            "[APPLY_CHANGE] Strategy 3b3 - text element selector result:",
+            target?.tagName
+          );
         }
       }
     } else if (
@@ -260,37 +409,59 @@ function applyChangeToElement(element: Element, change: PreviewChange): void {
       field.toLowerCase().includes("cta")
     ) {
       target = element.querySelector("a, button");
-      console.log("[APPLY_CHANGE] Strategy 3c - button selector result:", target?.tagName);
+      console.log(
+        "[APPLY_CHANGE] Strategy 3c - button selector result:",
+        target?.tagName
+      );
     } else if (field === "paragraphs" && Array.isArray(proposedValue)) {
       // For paragraphs field, don't find a single target - the element itself is the container
       // Set target to null to skip the single-value strategies and go directly to array handling
-      console.log("[APPLY_CHANGE] Strategy 3d - paragraphs array detected, will use array handler");
+      console.log(
+        "[APPLY_CHANGE] Strategy 3d - paragraphs array detected, will use array handler"
+      );
       // Don't set target - let it fall through to array handling below
     }
   }
 
   // Strategy 4: Use the parent element itself (only if it's a simple text container)
-  if (!target && (element.tagName === "P" || element.tagName === "SPAN" || element.tagName === "A" || element.tagName === "BUTTON")) {
+  if (
+    !target &&
+    (element.tagName === "P" ||
+      element.tagName === "SPAN" ||
+      element.tagName === "A" ||
+      element.tagName === "BUTTON")
+  ) {
     target = element;
-    console.log("[APPLY_CHANGE] Strategy 4 - using parent element as it's a text container");
+    console.log(
+      "[APPLY_CHANGE] Strategy 4 - using parent element as it's a text container"
+    );
   }
 
   // For array values like "paragraphs", "lists", "links", we apply them using the element as container
   // even if target is not found, since the array handler searches within the element
-  const isArrayField = Array.isArray(proposedValue) && (field === "paragraphs" || field === "lists" || field === "links");
-  
+  const isArrayField =
+    Array.isArray(proposedValue) &&
+    (field === "paragraphs" || field === "lists" || field === "links");
+
   // If we still don't have a target and it's NOT an array field, skip
   if (!target && !isArrayField) {
-    console.warn("[APPLY_CHANGE] No suitable target found, skipping update to avoid destroying element structure");
+    console.warn(
+      "[APPLY_CHANGE] No suitable target found, skipping update to avoid destroying element structure"
+    );
     return;
   }
 
-  console.log("[APPLY_CHANGE] Final target element:", target ? {
-    tagName: target.tagName,
-    id: target.id,
-    className: target.className,
-    currentContent: target.textContent?.substring(0, 100)
-  } : "null (will use element as container)");
+  console.log(
+    "[APPLY_CHANGE] Final target element:",
+    target
+      ? {
+          tagName: target.tagName,
+          id: target.id,
+          className: target.className,
+          currentContent: target.textContent?.substring(0, 100),
+        }
+      : "null (will use element as container)"
+  );
 
   // Apply the value based on type
   if (typeof proposedValue === "string") {
@@ -299,7 +470,7 @@ function applyChangeToElement(element: Element, change: PreviewChange): void {
       console.warn("[APPLY_CHANGE] No target found for string value, skipping");
       return;
     }
-    
+
     console.log("[APPLY_CHANGE] Applying string value:", proposedValue);
     // For simple strings, update text content
     if (target.tagName === "A" || target.tagName === "BUTTON") {
@@ -310,12 +481,15 @@ function applyChangeToElement(element: Element, change: PreviewChange): void {
       // For most elements, update text content
       target.textContent = proposedValue;
     }
-    console.log("[APPLY_CHANGE] String value applied, new content:", target.textContent?.substring(0, 100));
+    console.log(
+      "[APPLY_CHANGE] String value applied, new content:",
+      target.textContent?.substring(0, 100)
+    );
   } else if (Array.isArray(proposedValue)) {
     console.log("[APPLY_CHANGE] Applying array value:", proposedValue);
     // For arrays, use the element as the container (not the target)
     const container = target || element;
-    
+
     // Handle arrays (lists, paragraphs, etc.)
     if (field === "paragraphs") {
       const paragraphs = Array.from(container.querySelectorAll("p"));

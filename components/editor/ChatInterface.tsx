@@ -70,13 +70,10 @@ export function ChatInterface({
     editMode: "inline" | "modal";
   } | null>(null);
   const baselineRef = useRef<WebsiteContent>(initialContent);
+  const pendingRefreshRef = useRef(false);
 
   // Use the preview update hook for automatic preview generation
-  const {
-    previewHTML,
-    isPreviewLoading,
-    updatePreview,
-  } = usePreviewUpdate({
+  const { previewHTML, isPreviewLoading, updatePreview } = usePreviewUpdate({
     siteId: site.id,
     currentHTML,
   });
@@ -198,6 +195,7 @@ export function ChatInterface({
       try {
         setClientError(null);
         clearError?.();
+        pendingRefreshRef.current = true;
         await sendMessage(
           { text: message },
           {
@@ -207,6 +205,7 @@ export function ChatInterface({
           }
         );
       } catch (err) {
+        pendingRefreshRef.current = false;
         setClientError((err as Error).message);
       }
     },
@@ -340,7 +339,6 @@ export function ChatInterface({
         // Show success message - no status hook in this component level
         // Preview update will happen automatically via the effect
         // when previewChanges is updated above
-
       } catch (err) {
         setClientError((err as Error).message);
       }
@@ -465,30 +463,31 @@ export function ChatInterface({
     const assistantMessages = uiMessages.filter(
       (message) => message.role === "assistant"
     );
-    if (assistantMessages.length === 0) {
-      return;
-    }
-
     const latestAssistant = assistantMessages[assistantMessages.length - 1];
-    if (!latestAssistant || latestAssistant.id === lastAppliedAssistantId) {
+
+    if (latestAssistant && latestAssistant.id !== lastAppliedAssistantId) {
+      const explanationSource = extractAssistantSummary(latestAssistant).trim();
+      const plan = parseJsonPlan(explanationSource);
+      const explanation =
+        (plan?.explanation ?? explanationSource) || "Content updated";
+
+      pendingRefreshRef.current = false;
+      refreshDraft(explanation)
+        .then(() => {
+          setLastAppliedAssistantId(latestAssistant.id);
+        })
+        .catch((err) => {
+          setClientError((err as Error).message);
+        });
       return;
     }
 
-    const explanationSource = extractAssistantSummary(latestAssistant).trim();
-    if (!explanationSource) {
-      return;
-    }
-
-    const plan = parseJsonPlan(explanationSource);
-    const explanation = plan?.explanation ?? explanationSource;
-
-    refreshDraft(explanation)
-      .then(() => {
-        setLastAppliedAssistantId(latestAssistant.id);
-      })
-      .catch((err) => {
+    if (pendingRefreshRef.current) {
+      pendingRefreshRef.current = false;
+      refreshDraft("Content updated").catch((err) => {
         setClientError((err as Error).message);
       });
+    }
   }, [chatStatus, lastAppliedAssistantId, refreshDraft, uiMessages]);
 
   const visibleMessages = useMemo(

@@ -18,6 +18,7 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ siteId: string }> }
 ) {
+  const traceId = request.headers.get("x-trace-id") ?? "content-extract";
   // Get session first to extract tier for rate limiting
   let session;
   try {
@@ -45,7 +46,10 @@ export async function POST(
 
   const htmlFile = await getFileContent(site, site.htmlFile);
   const content = extractContentFromHtml(htmlFile.content);
-  setDraftContent(site.id, content);
+  setDraftContent(site.id, content, {
+    traceId,
+    source: "content-route:extract",
+  });
   const response = NextResponse.json({ content });
   return addRateLimitHeaders(response, rateLimitResult.result);
 }

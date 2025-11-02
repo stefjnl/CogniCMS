@@ -119,6 +119,10 @@ export function ContentOverview({
     );
   }
 
+  const metadataEntries = Object.entries(content.metadata ?? {}).filter(
+    ([key]) => key !== "schemaVersion"
+  );
+
   const toggleSection = (sectionId: string) => {
     setExpandedSections((prev) => {
       const next = new Set(prev);
@@ -142,6 +146,43 @@ export function ContentOverview({
 
   return (
     <div className="space-y-4">
+      {metadataEntries.length > 0 && (
+        <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">
+              🧭 Site Metadata
+            </h3>
+          </div>
+          <div className="px-4 py-3">
+            <dl className="space-y-3 text-sm">
+              {metadataEntries.map(([key, value]) => {
+                const pending = hasPendingChange("metadata", key);
+                return (
+                  <div
+                    key={key}
+                    className={`flex flex-col rounded p-2 ${
+                      pending ? "bg-amber-50 border border-amber-200" : ""
+                    }`}
+                  >
+                    <dt className="font-medium text-slate-700 capitalize">
+                      {key.replace(/([A-Z])/g, " $1")}
+                    </dt>
+                    <dd className="mt-1 text-slate-600">
+                      {typeof value === "string" ? value : String(value)}
+                      {pending && (
+                        <span className="ml-2 text-xs text-amber-600">
+                          (modified, not published)
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                );
+              })}
+            </dl>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">

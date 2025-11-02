@@ -22,6 +22,7 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ siteId: string }> }
 ) {
+  const traceId = request.headers.get("x-trace-id") ?? "content-get";
   const session = await ensureAuth();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -44,42 +45,39 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // First try to get the most recent content by extracting from HTML
+  // Check if there's already a draft in cache - return it immediately
+  const existingDraft = getDraftContent(siteId);
+  if (existingDraft) {
+    console.log("[GET_CONTENT] Returning cached draft");
+    const response = NextResponse.json({ content: existingDraft, draft: true });
+    return addRateLimitHeaders(response, rateLimitResult.result);
+  }
+
+  // No draft exists - load from content.json file
   try {
+    console.log("[GET_CONTENT] No draft found, loading from content.json");
+    const file = await getFileContent(site, site.contentFile);
+    const content = JSON.parse(file.content) as WebsiteContent;
+    setDraftContent(site.id, content, {
+      traceId,
+      source: "content-route:get:content-json",
+    });
+    const response = NextResponse.json({ content, draft: false });
+    return addRateLimitHeaders(response, rateLimitResult.result);
+  } catch (error) {
+    // Fallback: extract from HTML if content.json doesn't exist
+    console.log("[GET_CONTENT] content.json not found, extracting from HTML");
     const htmlFile = await getFileContent(site, site.htmlFile);
     const { extractContentFromHtml } = await import("@/lib/content/extractor");
     const extractedContent = extractContentFromHtml(htmlFile.content);
-
-    // Check if there's a draft with more recent modifications
-    const draft = getDraftContent(siteId);
-    if (draft && draft.metadata && draft.metadata.lastModified) {
-      const draftDate = new Date(draft.metadata.lastModified);
-      const extractedDate = new Date(extractedContent.metadata.lastModified);
-
-      if (draftDate > extractedDate) {
-        const response = NextResponse.json({ content: draft, draft: true });
-        return addRateLimitHeaders(response, rateLimitResult.result);
-      }
-    }
-
-    setDraftContent(site.id, extractedContent);
+    setDraftContent(site.id, extractedContent, {
+      traceId,
+      source: "content-route:get:html-fallback",
+    });
     const response = NextResponse.json({
       content: extractedContent,
       draft: false,
     });
-    return addRateLimitHeaders(response, rateLimitResult.result);
-  } catch (error) {
-    // Fallback to existing content.json if extraction fails
-    const draft = getDraftContent(siteId);
-    if (draft) {
-      const response = NextResponse.json({ content: draft, draft: true });
-      return addRateLimitHeaders(response, rateLimitResult.result);
-    }
-
-    const file = await getFileContent(site, site.contentFile);
-    const content = JSON.parse(file.content) as WebsiteContent;
-    setDraftContent(site.id, content);
-    const response = NextResponse.json({ content, draft: false });
     return addRateLimitHeaders(response, rateLimitResult.result);
   }
 }
@@ -88,6 +86,7 @@ export async function PUT(
   request: NextRequest,
   context: { params: Promise<{ siteId: string }> }
 ) {
+  const traceId = request.headers.get("x-trace-id") ?? "content-put";
   const session = await ensureAuth();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -105,7 +104,10 @@ export async function PUT(
 
   const body = await request.json();
   const { siteId } = await context.params;
-  setDraftContent(siteId, body as WebsiteContent);
+  setDraftContent(siteId, body as WebsiteContent, {
+    traceId,
+    source: "content-route:put",
+  });
   const response = NextResponse.json({ success: true });
   return addRateLimitHeaders(response, rateLimitResult.result);
 }

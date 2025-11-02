@@ -173,6 +173,9 @@ export function applyToolActions(
 
   actions.forEach((action) => executeAction(updated, action));
 
+  // Always update lastModified timestamp so the draft is fresher than HTML extraction
+  updated.metadata.lastModified = new Date().toISOString();
+
   return {
     content: updated,
     changes: diffWebsiteContent(previous, updated),

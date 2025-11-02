@@ -30,6 +30,7 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ siteId: string }> }
 ) {
+  const traceId = request.headers.get("x-trace-id") ?? "publish-post";
   console.log("[PUBLISH_API] Starting publish request");
 
   // Get session first to extract tier for rate limiting
@@ -127,7 +128,10 @@ export async function POST(
   const draft = getDraftContent(siteId);
   if (!draft) {
     console.log("[PUBLISH_API] No draft found, setting new draft");
-    setDraftContent(siteId, content);
+    setDraftContent(siteId, content, {
+      traceId,
+      source: "publish-route:post",
+    });
   } else {
     console.log("[PUBLISH_API] Draft found");
   }

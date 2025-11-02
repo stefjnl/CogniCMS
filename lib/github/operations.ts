@@ -84,6 +84,29 @@ export async function getFileContent(
   );
   console.log("[GET_FILE_CONTENT] Branch:", site.githubBranch);
 
+  // Development mode: Load from local examples folder
+  if (process.env.NODE_ENV === "development" && site.githubRepo === "zincafe-zweeloo") {
+    try {
+      console.log("[GET_FILE_CONTENT] Development mode: Loading from examples folder");
+      const fs = await import("fs/promises");
+      const pathLib = await import("path");
+      const localPath = pathLib.join(process.cwd(), "examples", path);
+      console.log("[GET_FILE_CONTENT] Local path:", localPath);
+
+      const content = await fs.readFile(localPath, "utf-8");
+      console.log("[GET_FILE_CONTENT] File loaded from local filesystem, length:", content.length);
+
+      return {
+        path,
+        sha: "local-dev",
+        content,
+      };
+    } catch (error) {
+      console.error("[GET_FILE_CONTENT] Failed to load local file, falling back to GitHub:", error);
+      // Fall through to GitHub API if local file doesn't exist
+    }
+  }
+
   try {
     const token = await resolveToken(site);
     console.log("[GET_FILE_CONTENT] Token resolved successfully");
