@@ -61,7 +61,7 @@ const nanoGptModel = (() => {
       "Content-Type": "application/json",
     },
   });
-  const modelId = process.env.NANOGPT_MODEL ?? "openai/gpt-oss-120b";
+  const modelId = process.env.NANOGPT_MODEL ?? "z-ai/glm-4.6";
   return provider.chat(modelId);
 })();
 
