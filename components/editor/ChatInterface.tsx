@@ -93,6 +93,7 @@ export function ChatInterface({
     commitMessage,
     onSuccess: (publishedHTML: string) => {
       // After successful publish, update baseline
+      console.log("[DEBUG onSuccess] Updating baseline to:", draftContent);
       baselineRef.current = draftContent!;
       setCurrentHTML(publishedHTML);
       setPreviewChanges([]);
@@ -160,6 +161,11 @@ export function ChatInterface({
   // Update preview automatically when changes occur
   // This effect replaces the manual setTimeout calls
   useEffect(() => {
+    console.log(
+      "[DEBUG Preview Effect] previewChanges updated:",
+      previewChanges
+    );
+    console.log("[DEBUG Preview Effect] Calling updatePreview...");
     updatePreview(previewChanges, draftContent?.sections || []);
   }, [previewChanges, draftContent?.sections, updatePreview]);
 
@@ -182,12 +188,33 @@ export function ChatInterface({
       setDraftContent(nextContent);
       const changes = diffAgainstBaseline(nextContent);
 
+      // Debug logging
+      console.log("[DEBUG refreshDraft] Baseline:", baselineRef.current);
+      console.log("[DEBUG refreshDraft] NextContent:", nextContent);
+      console.log("[DEBUG refreshDraft] Raw changes:", changes);
+
+      // Filter out automatic metadata.lastModified changes (always updated by applyToolActions)
+      const meaningfulChanges = changes.filter(
+        (change) =>
+          !(change.sectionId === "metadata" && change.field === "lastModified")
+      );
+
+      console.log(
+        "[DEBUG refreshDraft] Meaningful changes after filter:",
+        meaningfulChanges
+      );
+
       // Attribute changes to AI source (fixes AI editing preview issue)
-      const attributedChanges = changes.map((change) => ({
+      const attributedChanges = meaningfulChanges.map((change) => ({
         ...change,
         source: "ai" as const,
         timestamp: new Date().toISOString(),
       }));
+
+      console.log(
+        "[DEBUG refreshDraft] Attributed changes:",
+        attributedChanges
+      );
 
       setPreviewChanges(attributedChanges);
       const nextCommit = buildCommitMessage(attributedChanges);
@@ -272,7 +299,10 @@ export function ChatInterface({
       }
 
       const { content } = await contentResponse.json();
-      console.log("[RESCAN] Content updated, sections count:", content.sections.length);
+      console.log(
+        "[RESCAN] Content updated, sections count:",
+        content.sections.length
+      );
 
       // Update the UI state
       setDraftContent(content);
@@ -473,8 +503,16 @@ export function ChatInterface({
         // Recompute changes
         const changes = diffAgainstBaseline(revertedContent);
 
+        // Filter out metadata.lastModified changes
+        const meaningfulChanges = changes.filter(
+          (change) =>
+            !(
+              change.sectionId === "metadata" && change.field === "lastModified"
+            )
+        );
+
         // Preserve source attribution from existing changes where possible
-        const attributedChanges = changes.map((change) => {
+        const attributedChanges = meaningfulChanges.map((change) => {
           const existing = previewChanges.find(
             (c) => c.sectionId === change.sectionId && c.field === change.field
           );
@@ -570,7 +608,11 @@ export function ChatInterface({
   return (
     <div className="flex h-screen flex-col">
       <div className="flex-shrink-0 border-b border-slate-200 bg-white p-6">
-        <SiteHeader site={site} lastSynced={lastModified} onRescan={handleRescan} />
+        <SiteHeader
+          site={site}
+          lastSynced={lastModified}
+          onRescan={handleRescan}
+        />
         <div className="mt-4">
           <StatusBar
             gitHubConnected={true}

@@ -37,8 +37,12 @@ export function usePreviewUpdate({
 
   const updatePreview = useCallback(
     async (changes: PreviewChange[], sections: WebsiteContent["sections"]) => {
+      console.log("[DEBUG usePreviewUpdate] Called with changes:", changes);
+      console.log("[DEBUG usePreviewUpdate] Sections count:", sections.length);
+
       // If no changes, use current HTML
       if (changes.length === 0) {
+        console.log("[DEBUG usePreviewUpdate] No changes, using current HTML");
         setPreviewHTML(currentHTML);
         return;
       }
@@ -48,6 +52,7 @@ export function usePreviewUpdate({
       abortControllerRef.current = new AbortController();
 
       setIsPreviewLoading(true);
+      console.log("[DEBUG usePreviewUpdate] Fetching preview from API...");
 
       try {
         const response = await fetch(`/api/preview/${siteId}`, {
@@ -70,10 +75,15 @@ export function usePreviewUpdate({
         }
 
         const { html } = await response.json();
+        console.log(
+          "[DEBUG usePreviewUpdate] Preview generated successfully, length:",
+          html.length
+        );
         setPreviewHTML(html);
       } catch (error) {
         // Ignore AbortError (cancelled requests)
         if (error instanceof Error && error.name === "AbortError") {
+          console.log("[DEBUG usePreviewUpdate] Request aborted");
           return;
         }
         console.error("[usePreviewUpdate] Preview update failed:", error);
