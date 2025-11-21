@@ -732,52 +732,48 @@ export function ChatInterface({
             )}
 
             {activeTab === "chat" && (
-              <div className="space-y-3">
-                {/* AI conversation */}
-                <div className={`${cardBase} space-y-2`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="text-xs font-semibold text-slate-500 tracking-wide uppercase">
-                      AI conversation
-                    </div>
-                    <span className="text-[9px] text-slate-400">
-                      Site-aware, schema-driven
-                    </span>
-                  </div>
-                  <div className="min-h-[300px] max-h-[500px] overflow-y-auto space-y-1.5 pr-1">
-                    <MessageList
-                      messages={visibleMessages}
-                      changes={previewChanges}
-                      lastAssistantMessageId={lastAppliedAssistantId}
-                    />
-                  </div>
-                  <div className="mt-1">
-                    <div className="rounded-lg border border-slate-200 bg-white focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500">
-                      <MessageInput
-                        onSend={handleSend}
-                        disabled={isChatStreaming || publishState === "publishing"}
-                      />
-                    </div>
-                  </div>
-                  {showSpinner && (
-                    <div className="flex items-center gap-3 rounded-lg border border-indigo-100 bg-indigo-50/90 p-2.5">
+              <div className="flex flex-col h-[calc(100vh-280px)] bg-white rounded-xl border border-gray-200 shadow-sm">
+                {/* Chat messages - scrollable */}
+                <div className="flex-1 overflow-y-auto p-4">
+                  <MessageList
+                    messages={visibleMessages}
+                    changes={previewChanges}
+                    lastAssistantMessageId={lastAppliedAssistantId}
+                  />
+                </div>
+
+                {/* Status indicators */}
+                {showSpinner && (
+                  <div className="px-4 py-2 border-t border-gray-100">
+                    <div className="flex items-center gap-3 rounded-lg border border-emerald-100 bg-emerald-50/90 p-2.5">
                       <LoadingSpinner />
                       <div className="flex-1">
-                        <p className="text-[11px] font-semibold text-indigo-900">
+                        <p className="text-[11px] font-semibold text-emerald-900">
                           AI is working...
                         </p>
                         {aiThinking && (
-                          <p className="text-[10px] text-indigo-700">
+                          <p className="text-[10px] text-emerald-700">
                             {aiThinking}
                           </p>
                         )}
                       </div>
                     </div>
-                  )}
-                  {clientError && (
+                  </div>
+                )}
+                {clientError && (
+                  <div className="px-4 py-2 border-t border-gray-100">
                     <div className="rounded-lg border border-red-200 bg-red-50 p-2.5">
                       <p className="text-[10px] text-red-700">{clientError}</p>
                     </div>
-                  )}
+                  </div>
+                )}
+
+                {/* Input area - fixed at bottom */}
+                <div className="border-t border-gray-200 bg-gray-50 p-4">
+                  <MessageInput
+                    onSend={handleSend}
+                    disabled={isChatStreaming || publishState === "publishing"}
+                  />
                 </div>
               </div>
             )}

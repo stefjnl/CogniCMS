@@ -123,7 +123,7 @@ export function MessageList({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {messages.map((message, index) => {
         const content = extractMessageContent(message);
         const role = message.role === "user" ? "user" : "assistant";
@@ -144,15 +144,15 @@ export function MessageList({
               }`}
             >
               <div
-                className={`max-w-xl rounded-lg px-4 py-3 text-sm shadow-sm ${
+                className={`rounded-2xl px-4 py-3 shadow-sm ${
                   role === "user"
-                    ? "bg-blue-600 text-white"
-                    : "bg-slate-100 text-slate-900 border border-slate-200"
+                    ? "bg-blue-700 text-white max-w-[80%] ml-auto"
+                    : "bg-gray-50 text-gray-800 max-w-[90%] mr-auto border border-gray-200"
                 }`}
               >
-                <pre className="whitespace-pre-wrap break-words font-sans text-sm">
+                <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
                   {content}
-                </pre>
+                </div>
               </div>
             </div>
 

@@ -52,25 +52,29 @@ export function MessageInput({
           disabled={disabled}
         />
       )}
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <textarea
-          className="min-h-[80px] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-          placeholder="Describe the update you need... (⌘+Enter to send)"
-          value={value}
-          disabled={disabled || submitting}
-          onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
-            setValue(event.target.value)
-          }
-          onKeyDown={handleKeyDown}
-        />
-        <Button
-          type="submit"
-          disabled={disabled || submitting || !value.trim()}
-          className="self-end"
-        >
-          Send
-        </Button>
-      </form>
+      <div className="space-y-2">
+        <form onSubmit={handleSubmit} className="flex items-end gap-2">
+          <textarea
+            className="flex-1 resize-none rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm focus-visible:outline-none focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-100 placeholder:text-gray-400"
+            placeholder="Describe the update you need..."
+            value={value}
+            rows={1}
+            disabled={disabled || submitting}
+            onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
+              setValue(event.target.value)
+            }
+            onKeyDown={handleKeyDown}
+          />
+          <button
+            type="submit"
+            disabled={disabled || submitting || !value.trim()}
+            className="px-5 py-3 rounded-xl bg-emerald-600 text-white font-medium text-sm hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          >
+            Send
+          </button>
+        </form>
+        <p className="text-xs text-gray-400 text-right">⌘+Enter to send</p>
+      </div>
     </div>
   );
 }

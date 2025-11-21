@@ -49,21 +49,18 @@ export function SmartSuggestions({
   disabled,
 }: SmartSuggestionsProps) {
   return (
-    <div className="space-y-2">
-      <p className="text-xs font-medium text-slate-600">Quick suggestions:</p>
-      <div className="flex flex-wrap gap-2">
-        {SUGGESTIONS.slice(0, 4).map((suggestion, index) => (
-          <button
-            key={index}
-            onClick={() => onSelect(suggestion.prompt)}
-            disabled={disabled}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span>{suggestion.icon}</span>
-            <span>{suggestion.label}</span>
-          </button>
-        ))}
-      </div>
+    <div className="flex flex-wrap gap-2">
+      {SUGGESTIONS.slice(0, 4).map((suggestion, index) => (
+        <button
+          key={index}
+          onClick={() => onSelect(suggestion.prompt)}
+          disabled={disabled}
+          className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-100 px-3 py-1.5 text-xs text-gray-600 transition-colors hover:bg-gray-200 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <span className="text-[11px]">{suggestion.icon}</span>
+          <span>{suggestion.label}</span>
+        </button>
+      ))}
     </div>
   );
 }
