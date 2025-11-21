@@ -9,6 +9,7 @@ const SUPPORTED_TOOL_NAMES = [
   "addListItem",
   "removeListItem",
   "batchUpdate",
+  "updateNextEvent",
 ] as const;
 
 const updateSectionTextSchema = z.object({
@@ -63,11 +64,61 @@ export type SupportedTool =
   | "updateListItem"
   | "addListItem"
   | "removeListItem"
-  | "batchUpdate";
+  | "batchUpdate"
+  | "updateNextEvent";
 
 export interface ToolAction {
   tool: SupportedTool;
   params: Record<string, unknown>;
+}
+
+/**
+ * Helper for NL queries like "verander de eerstvolgende bijeenkomst naar 25 december".
+ * Targets sectionId = "events", field = "upcoming" and enforces a single isNext=true.
+ */
+function updateNextEventDate(
+  content: WebsiteContent,
+  params: { sectionId: string; date: string }
+): void {
+  const sectionId = params.sectionId || "events";
+  const target = content.sections.find(
+    (section: WebsiteContent["sections"][number]) => section.id === sectionId
+  );
+  if (!target) {
+    throw new Error(`Section ${sectionId} not found`);
+  }
+
+  if (!Array.isArray(target.content.upcoming)) {
+    target.content.upcoming = [];
+  }
+
+  const upcoming = target.content.upcoming as Array<Record<string, unknown>>;
+
+  if (upcoming.length === 0) {
+    upcoming.push({
+      title: "Eerstvolgende bijeenkomst",
+      date: params.date,
+      isNext: true,
+    });
+    return;
+  }
+
+  let nextIndex = upcoming.findIndex(
+    (item) => item && typeof item === "object" && (item as any).isNext === true
+  );
+  if (nextIndex < 0) {
+    nextIndex = 0;
+  }
+
+  upcoming.forEach((item, index) => {
+    if (item && typeof item === "object") {
+      (item as any).isNext = index === nextIndex;
+    }
+  });
+
+  const next = upcoming[nextIndex] as Record<string, unknown>;
+  next.date = params.date;
+  next.isNext = true;
 }
 
 function cloneContent(content: WebsiteContent): WebsiteContent {
@@ -164,6 +215,16 @@ export function applyToolActions(
           (item: { tool: string; params: Record<string, unknown> }) =>
             executeAction(target, item as ToolAction)
         );
+        return;
+      }
+      case "updateNextEvent": {
+        const payload = z
+          .object({
+            sectionId: z.string().default("events"),
+            date: z.string(),
+          })
+          .parse(action.params);
+        updateNextEventDate(target, payload);
         return;
       }
       default:

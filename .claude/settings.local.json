@@ -6,7 +6,8 @@
       "Bash(netstat:*)",
       "Bash(findstr:*)",
       "Bash(npm run test:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(pnpm dev)"
     ],
     "deny": [],
     "ask": []

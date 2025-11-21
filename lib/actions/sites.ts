@@ -29,12 +29,7 @@ import {
  * - Unexpected errors are sanitized and logged
  */
 
-interface ActionResult<T = unknown> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  digest?: string;
-}
+import type { ActionResult } from "@/lib/types/action-result";
 
 /**
  * Get all sites for the current user
@@ -58,7 +53,8 @@ export async function getSitesAction(): Promise<ActionResult<SiteConfig[]>> {
     if (isOperationalError(error)) {
       return {
         success: false,
-        error: error.userMessage,
+        code: "INTERNAL_ERROR",
+        message: error.userMessage,
       };
     }
 
@@ -66,8 +62,9 @@ export async function getSitesAction(): Promise<ActionResult<SiteConfig[]>> {
     const sanitized = sanitizeError(error);
     return {
       success: false,
-      error: sanitized.message,
-      digest: sanitized.digest,
+      code: "INTERNAL_ERROR",
+      message: sanitized.message,
+      details: { digest: sanitized.digest },
     };
   }
 }
@@ -96,15 +93,17 @@ export async function getSiteAction(
     if (isOperationalError(error)) {
       return {
         success: false,
-        error: error.userMessage,
+        code: error instanceof NotFoundError ? "NOT_FOUND" : "INTERNAL_ERROR",
+        message: error.userMessage,
       };
     }
 
     const sanitized = sanitizeError(error);
     return {
       success: false,
-      error: sanitized.message,
-      digest: sanitized.digest,
+      code: "INTERNAL_ERROR",
+      message: sanitized.message,
+      details: { digest: sanitized.digest },
     };
   }
 }
@@ -120,7 +119,8 @@ export async function createSiteAction(
   } catch {
     return {
       success: false,
-      error: "Unauthorized",
+      code: "UNAUTHORIZED",
+      message: "Unauthorized",
     };
   }
 
@@ -130,7 +130,9 @@ export async function createSiteAction(
     if (!validation.success) {
       return {
         success: false,
-        error: "Invalid site data: " + validation.error.message,
+        code: "VALIDATION_ERROR",
+        message: "Invalid site data: " + validation.error.message,
+        details: validation.error.flatten(),
       };
     }
 
@@ -142,7 +144,9 @@ export async function createSiteAction(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to create site",
+      code: "INTERNAL_ERROR",
+      message:
+        error instanceof Error ? error.message : "Failed to create site",
     };
   }
 }
@@ -159,7 +163,8 @@ export async function updateSiteAction(
   } catch {
     return {
       success: false,
-      error: "Unauthorized",
+      code: "UNAUTHORIZED",
+      message: "Unauthorized",
     };
   }
 
@@ -168,7 +173,8 @@ export async function updateSiteAction(
     if (!site) {
       return {
         success: false,
-        error: "Site not found",
+        code: "NOT_FOUND",
+        message: "Site not found",
       };
     }
     return {
@@ -178,7 +184,9 @@ export async function updateSiteAction(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to update site",
+      code: "INTERNAL_ERROR",
+      message:
+        error instanceof Error ? error.message : "Failed to update site",
     };
   }
 }
@@ -194,7 +202,8 @@ export async function deleteSiteAction(
   } catch {
     return {
       success: false,
-      error: "Unauthorized",
+      code: "UNAUTHORIZED",
+      message: "Unauthorized",
     };
   }
 
@@ -202,11 +211,14 @@ export async function deleteSiteAction(
     await deleteSite(siteId);
     return {
       success: true,
+      data: undefined,
     };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to delete site",
+      code: "INTERNAL_ERROR",
+      message:
+        error instanceof Error ? error.message : "Failed to delete site",
     };
   }
 }

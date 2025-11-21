@@ -1,12 +1,45 @@
 import { PreviewChange } from "@/types/content";
 import { JSDOM } from "jsdom";
+import {
+  PageDefinition,
+  MetadataFieldDefinition,
+  FieldDefinition,
+} from "@/types/content-schema";
+import { siteDefinitionConfig } from "@/lib/config/site-definitions";
+import { getPageDefinitionForSiteConfig } from "@/lib/config/page-definition-resolver";
 
 function applyMetadataChange(
   document: Document,
-  change: PreviewChange
+  change: PreviewChange,
+  pageDefinition?: PageDefinition | null
 ): boolean {
   if (change.sectionId !== "metadata") {
     return false;
+  }
+
+  // Config-driven metadata mapping (if available).
+  if (pageDefinition && typeof change.proposedValue === "string") {
+    const metaDef = (pageDefinition.metadata || []).find(
+      (def) => (def.metadataKey as string) === change.field
+    );
+    if (metaDef) {
+      const target =
+        (metaDef.absoluteSelector
+          ? document.querySelector(metaDef.absoluteSelector)
+          : null) ||
+        (metaDef.relativeSelector
+          ? document.querySelector(metaDef.relativeSelector)
+          : null);
+
+      if (target) {
+        if (metaDef.attributeName) {
+          target.setAttribute(metaDef.attributeName, change.proposedValue);
+        } else {
+          target.textContent = change.proposedValue;
+        }
+        return true;
+      }
+    }
   }
 
   if (typeof change.proposedValue !== "string") {
@@ -80,19 +113,61 @@ function applyMetadataChange(
 }
 
 /**
- * Get the actual selector for a section change
- * This function tries multiple strategies to find the right element
+ * Resolve the PageDefinition used for preview mapping based on an optional hint.
+ * The htmlFilePath should match the one used during extraction when available.
+ */
+function resolvePageDefinitionForPreview(
+  htmlFilePath?: string
+): PageDefinition | null {
+  if (!htmlFilePath) {
+    return null;
+  }
+  // Use config-only resolver to avoid leaking jsdom usage into any client bundles.
+  return getPageDefinitionForSiteConfig(
+    htmlFilePath,
+    undefined,
+    siteDefinitionConfig
+  );
+}
+
+/**
+ * Get the actual selector for a section change.
+ * Prefers schema-driven mapping when available, then falls back to heuristics.
  */
 export function getSelectorForChange(
   change: PreviewChange,
-  sections?: any[]
+  sections?: any[],
+  pageDefinition?: PageDefinition | null
 ): string {
-  const selectors = [];
+  const selectors: string[] = [];
+
+  // Schema-driven resolution when we know the page definition.
+  if (pageDefinition && change.sectionId !== "metadata") {
+    const sectionDef = pageDefinition.sections.find(
+      (s) => s.id === change.sectionId
+    );
+    if (sectionDef) {
+      const fieldDef = (sectionDef.fields || []).find(
+        (f) => f.key === change.field
+      );
+
+      // Field-level selector if present
+      if (fieldDef?.absoluteSelector) {
+        selectors.push(fieldDef.absoluteSelector);
+      } else if (sectionDef.absoluteSelector && fieldDef?.relativeSelector) {
+        selectors.push(
+          `${sectionDef.absoluteSelector} ${fieldDef.relativeSelector}`
+        );
+      } else if (sectionDef.absoluteSelector) {
+        selectors.push(sectionDef.absoluteSelector);
+      }
+    }
+  }
 
   // If we have sections data, try to find the matching section and use its selector
   if (sections) {
     const matchingSection = sections.find(
-      (section) => section.id === change.sectionId
+      (section: any) => section.id === change.sectionId
     );
     if (matchingSection && matchingSection.selector) {
       selectors.push(matchingSection.selector);
@@ -149,12 +224,177 @@ export function getSelectorForChange(
 }
 
 /**
+ * Specialized handler for events-related changes driven by PageDefinition.domHints.
+ * Returns true if any DOM updates were applied for the given change.
+ */
+function applyEventsChangesWithDomHints(
+  document: Document,
+  change: PreviewChange,
+  pageDefinition?: PageDefinition | null
+): boolean {
+  if (!pageDefinition?.domHints?.events) {
+    return false;
+  }
+
+  if (change.sectionId !== "events") {
+    return false;
+  }
+
+  const domHints = pageDefinition.domHints.events;
+
+  const isUpcomingFieldChange =
+    change.field === "upcoming" ||
+    (typeof change.field === "string" &&
+      change.field.startsWith("upcoming")) ||
+    (typeof (change as any).path === "string" &&
+      (change as any).path.includes("upcoming"));
+
+  if (!isUpcomingFieldChange) {
+    return false;
+  }
+
+  const proposed = change.proposedValue as unknown;
+
+  if (!Array.isArray(proposed)) {
+    return false;
+  }
+
+  type EventItem = {
+    title?: string;
+    date?: string;
+    isNext?: boolean;
+    availabilityText?: string;
+    ctaLabel?: string;
+    ctaUrl?: string;
+  };
+
+  const items = proposed as EventItem[];
+  if (!items || items.length === 0) {
+    return false;
+  }
+
+  const next =
+    items.find((item) => item && item.isNext) ??
+    (items[0] as EventItem | undefined);
+
+  if (!next || !next.date) {
+    return false;
+  }
+
+  let applied = false;
+
+  if (domHints.nextEventBanner) {
+    const banner = document.querySelector(domHints.nextEventBanner.selector);
+    if (banner) {
+      const textTemplate = domHints.nextEventBanner.textTemplate;
+      const text = textTemplate.replace("{{date}}", next.date ?? "");
+      banner.textContent = text;
+      applied = true;
+
+      if (domHints.nextEventBanner.availabilitySelector) {
+        const availabilityEl = document.querySelector(
+          domHints.nextEventBanner.availabilitySelector
+        );
+        if (availabilityEl && next.availabilityText) {
+          availabilityEl.textContent = next.availabilityText;
+        }
+      }
+    }
+  }
+
+  if (domHints.upcomingList) {
+    const {
+      containerSelector,
+      itemSelector,
+      titleSelector,
+      dateSelector,
+      availabilitySelector,
+      ctaSelector,
+    } = domHints.upcomingList;
+
+    const container = document.querySelector(containerSelector);
+    if (container) {
+      const existingItems = Array.from(
+        container.querySelectorAll(itemSelector)
+      );
+      const ownerDocument = container.ownerDocument || document;
+
+      const ensureItemElement = (index: number): Element => {
+        if (existingItems[index]) {
+          return existingItems[index];
+        }
+        const wrapper = ownerDocument.createElement("div");
+        wrapper.className = itemSelector.replace(/^\./, "");
+        container.appendChild(wrapper);
+        return wrapper;
+      };
+
+      items.forEach((item, index) => {
+        const eventItem = item || {};
+        const el = ensureItemElement(index);
+
+        if (titleSelector && eventItem.title) {
+          const titleEl =
+            el.querySelector(titleSelector) ||
+            el.querySelector("h2, h3, h4, .event-title");
+          if (titleEl) {
+            titleEl.textContent = eventItem.title;
+          }
+        }
+
+        if (dateSelector && eventItem.date) {
+          const dateEl =
+            el.querySelector(dateSelector) ||
+            el.querySelector(".event-date, time");
+          if (dateEl) {
+            dateEl.textContent = eventItem.date;
+          }
+        }
+
+        if (availabilitySelector && eventItem.availabilityText) {
+          const availEl =
+            el.querySelector(availabilitySelector) ||
+            el.querySelector(".event-availability");
+          if (availEl) {
+            availEl.textContent = eventItem.availabilityText;
+          }
+        }
+
+        if (ctaSelector && (eventItem.ctaLabel || eventItem.ctaUrl)) {
+          const ctaEl =
+            el.querySelector(ctaSelector) || el.querySelector("a, button");
+          if (ctaEl) {
+            if (eventItem.ctaLabel) {
+              (ctaEl as HTMLElement).textContent = eventItem.ctaLabel;
+            }
+            if (
+              eventItem.ctaUrl &&
+              (ctaEl as HTMLAnchorElement).setAttribute
+            ) {
+              (ctaEl as HTMLAnchorElement).setAttribute(
+                "href",
+                eventItem.ctaUrl
+              );
+            }
+          }
+        }
+      });
+
+      applied = true;
+    }
+  }
+
+  return applied;
+}
+
+/**
  * Apply changes to HTML by modifying the DOM elements
  */
 export function applyChangesToHTML(
   originalHTML: string,
   changes: PreviewChange[],
-  sections?: any[]
+  sections?: any[],
+  htmlFilePath?: string
 ): string {
   console.log("[APPLY_CHANGES] Starting applyChangesToHTML");
   console.log(
@@ -171,6 +411,7 @@ export function applyChangesToHTML(
 
   const dom = new JSDOM(originalHTML);
   const { document } = dom.window;
+  const pageDefinition = resolvePageDefinitionForPreview(htmlFilePath);
 
   console.log(
     "[APPLY_CHANGES] DOM created, document element:",
@@ -179,13 +420,18 @@ export function applyChangesToHTML(
 
   for (const change of changes) {
     try {
-      if (applyMetadataChange(document, change)) {
+      if (applyMetadataChange(document, change, pageDefinition)) {
         console.log("[APPLY_CHANGES] Metadata change applied:", change);
         continue;
       }
 
+      if (applyEventsChangesWithDomHints(document, change, pageDefinition)) {
+        console.log("[APPLY_CHANGES] Events/domHints change applied:", change);
+        continue;
+      }
+
       console.log("[APPLY_CHANGES] Processing change:", change);
-      const selector = getSelectorForChange(change, sections);
+      const selector = getSelectorForChange(change, sections, pageDefinition);
       console.log("[APPLY_CHANGES] Generated selector:", selector);
 
       const element = document.querySelector(selector);
@@ -246,7 +492,8 @@ export function applyChangesToHTML(
 export function addChangeHighlights(
   html: string,
   changes: PreviewChange[],
-  sections?: any[]
+  sections?: any[],
+  htmlFilePath?: string
 ): string {
   if (!changes || changes.length === 0) {
     return html;
@@ -254,6 +501,7 @@ export function addChangeHighlights(
 
   const dom = new JSDOM(html);
   const { document } = dom.window;
+  const pageDefinition = resolvePageDefinitionForPreview(htmlFilePath);
 
   // Inject highlight CSS into the head
   const style = document.createElement("style");
@@ -304,7 +552,7 @@ export function addChangeHighlights(
         continue;
       }
 
-      const selector = getSelectorForChange(change, sections);
+      const selector = getSelectorForChange(change, sections, pageDefinition);
       const element = document.querySelector(selector);
 
       if (element) {

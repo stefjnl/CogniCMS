@@ -16,6 +16,15 @@ import { buildCommitMessage } from "@/lib/utils/commit";
 import { useEditorShortcuts } from "@/lib/utils/keyboard";
 import { PreviewChange, WebsiteContent } from "@/types/content";
 import { SiteConfig } from "@/types/site";
+import {
+  PageDefinition,
+  SiteConfigWithPageDefinition,
+} from "@/types/content-schema";
+import {
+  siteDefinitionConfig,
+  ZincafeLandingPageDefinition,
+} from "@/lib/config/site-definitions";
+import { getPageDefinitionForSiteConfig } from "@/lib/config/page-definition-resolver";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -69,10 +78,29 @@ export function ChatInterface({
     field: string;
     editMode: "inline" | "modal";
   } | null>(null);
+  const [activeTab, setActiveTab] = useState<"metadata" | "sections" | "chat">("sections");
   const baselineRef = useRef<WebsiteContent>(initialContent);
   const pendingRefreshRef = useRef(false);
 
-  // Use the preview update hook for automatic preview generation
+  // Resolve active PageDefinition for this site/html using the config-only resolver.
+  const pageDefinition: PageDefinition | null = useMemo(() => {
+    const enrichedSite: SiteConfigWithPageDefinition = {
+      ...(site as SiteConfigWithPageDefinition),
+      // Allow explicit mapping for the bundled Zincafe example without mutating stored config.
+      pageDefinitionId:
+        (site as SiteConfigWithPageDefinition).pageDefinitionId ??
+        (site.htmlFile === ZincafeLandingPageDefinition.htmlPath
+          ? ZincafeLandingPageDefinition.id
+          : undefined),
+    };
+    return getPageDefinitionForSiteConfig(
+      site.htmlFile,
+      enrichedSite,
+      siteDefinitionConfig
+    );
+  }, [site]);
+  
+    // Use the preview update hook for automatic preview generation
   const { previewHTML, isPreviewLoading, updatePreview } = usePreviewUpdate({
     siteId: site.id,
     currentHTML,
@@ -605,105 +633,195 @@ export function ChatInterface({
     [uiMessages]
   );
 
+  const cardBase =
+    "rounded-xl border bg-white/60 backdrop-blur-sm shadow-sm p-4";
+  const labelBase = "text-xs font-medium text-slate-600";
+
+  const pendingCount = previewChanges.length;
+
   return (
-    <div className="flex h-screen flex-col">
-      <div className="flex-shrink-0 border-b border-slate-200 bg-white p-6">
-        <SiteHeader
-          site={site}
-          lastSynced={lastModified}
-          onRescan={handleRescan}
-        />
-        <div className="mt-4">
-          <StatusBar
-            gitHubConnected={true}
-            aiModel="z-ai/glm-4.6"
-            unpublishedChanges={previewChanges.length}
-          />
-        </div>
-      </div>
-
-      {/* Main layout: Left column (2 rows) + Right column (site preview) */}
-      <div className="flex flex-1 gap-6 overflow-hidden bg-slate-50 p-6">
-        {/* Left Column: Top = Content Overview, Bottom = AI Chat */}
-        <div className="flex w-2/5 flex-col gap-6">
-          {/* Top Left: Content Overview + Preview Panel */}
-          <div className="flex h-1/2 flex-col space-y-4 overflow-y-auto">
-            <ContentOverview
-              content={draftContent}
-              pendingChanges={previewChanges}
-              onStartEdit={handleStartEdit}
-              editingField={editingField}
-              onSaveEdit={handleSaveEdit}
-              onCancelEdit={handleCancelEdit}
+    <div className="flex h-screen bg-slate-50">
+      {/* Left sidebar */}
+      <aside className="w-[380px] xl:w-[420px] bg-slate-50/80 border-r border-slate-200/80 backdrop-blur-md">
+        <div className="h-screen sticky top-0 flex flex-col">
+          {/* Header + status */}
+          <div className="px-4 pt-4 pb-2 border-b border-slate-200/70 bg-white/70 backdrop-blur-sm">
+            <SiteHeader
+              site={site}
+              lastSynced={lastModified}
+              onRescan={handleRescan}
             />
-
-            <PreviewPanel
-              draftContent={draftContent}
-              changes={previewChanges}
-              onDiscardChange={handleDiscardChange}
-              onDiscardAll={handleDiscardAll}
-            />
-
-            <PublishingStatus
-              state={publishState}
-              changeCount={previewChanges.length}
-              message={statusMessage || undefined}
-              onPublish={handlePublish}
-              onViewLive={() =>
-                window.open(
-                  `https://${site.githubOwner}.github.io/${site.githubRepo}/`,
-                  "_blank"
-                )
-              }
-            />
-
-            <ApprovalButtons
-              onPublish={handlePublish}
-              onReset={handleReset}
-              disabled={disablePublish}
-              changeCount={previewChanges.length}
-            />
-          </div>
-
-          {/* Bottom Left: AI Chat Panel */}
-          <div className="flex h-1/2 flex-col space-y-4">
-            <div className="flex-1 overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-              <MessageList
-                messages={visibleMessages}
-                changes={previewChanges}
-                lastAssistantMessageId={lastAppliedAssistantId}
+            <div className="mt-3">
+              <StatusBar
+                gitHubConnected={true}
+                aiModel="z-ai/glm-4.6"
+                unpublishedChanges={pendingCount}
               />
             </div>
+          </div>
 
-            <MessageInput
-              onSend={handleSend}
-              disabled={isChatStreaming || publishState === "publishing"}
-            />
+          {/* Tab bar */}
+          <div className="flex border-b border-slate-200/70 bg-white/40">
+            <button
+              onClick={() => setActiveTab("metadata")}
+              className={`flex-1 px-3 py-2.5 text-[11px] font-medium transition-colors ${
+                activeTab === "metadata"
+                  ? "text-indigo-600 border-b-2 border-indigo-600 bg-white/60"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50/50"
+              }`}
+            >
+              <div className="flex items-center justify-center gap-1.5">
+                <span>📋</span>
+                <span>Metadata</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab("sections")}
+              className={`flex-1 px-3 py-2.5 text-[11px] font-medium transition-colors ${
+                activeTab === "sections"
+                  ? "text-indigo-600 border-b-2 border-indigo-600 bg-white/60"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50/50"
+              }`}
+            >
+              <div className="flex items-center justify-center gap-1.5">
+                <span>📄</span>
+                <span>Sections</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab("chat")}
+              className={`flex-1 px-3 py-2.5 text-[11px] font-medium transition-colors ${
+                activeTab === "chat"
+                  ? "text-indigo-600 border-b-2 border-indigo-600 bg-white/60"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50/50"
+              }`}
+            >
+              <div className="flex items-center justify-center gap-1.5">
+                <span>🤖</span>
+                <span>AI Chat</span>
+              </div>
+            </button>
+          </div>
 
-            {showSpinner && (
-              <div className="flex items-center gap-3 rounded-lg border border-brand-200 bg-brand-50 p-3">
-                <LoadingSpinner />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-brand-900">
-                    AI is working...
-                  </p>
-                  {aiThinking && (
-                    <p className="text-xs text-brand-700">{aiThinking}</p>
+          {/* Tab content */}
+          <div className="flex-1 overflow-y-auto px-4 pt-4 pb-3">
+            {activeTab === "metadata" && (
+              <ContentOverview
+                content={draftContent}
+                pendingChanges={previewChanges}
+                pageDefinition={pageDefinition || undefined}
+                onStartEdit={handleStartEdit}
+                editingField={editingField}
+                onSaveEdit={handleSaveEdit}
+                onCancelEdit={handleCancelEdit}
+                showOnlyMetadata={true}
+              />
+            )}
+
+            {activeTab === "sections" && (
+              <ContentOverview
+                content={draftContent}
+                pendingChanges={previewChanges}
+                pageDefinition={pageDefinition || undefined}
+                onStartEdit={handleStartEdit}
+                editingField={editingField}
+                onSaveEdit={handleSaveEdit}
+                onCancelEdit={handleCancelEdit}
+                showOnlySections={true}
+              />
+            )}
+
+            {activeTab === "chat" && (
+              <div className="space-y-3">
+                {/* AI conversation */}
+                <div className={`${cardBase} space-y-2`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-xs font-semibold text-slate-500 tracking-wide uppercase">
+                      AI conversation
+                    </div>
+                    <span className="text-[9px] text-slate-400">
+                      Site-aware, schema-driven
+                    </span>
+                  </div>
+                  <div className="min-h-[300px] max-h-[500px] overflow-y-auto space-y-1.5 pr-1">
+                    <MessageList
+                      messages={visibleMessages}
+                      changes={previewChanges}
+                      lastAssistantMessageId={lastAppliedAssistantId}
+                    />
+                  </div>
+                  <div className="mt-1">
+                    <div className="rounded-lg border border-slate-200 bg-white focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500">
+                      <MessageInput
+                        onSend={handleSend}
+                        disabled={isChatStreaming || publishState === "publishing"}
+                      />
+                    </div>
+                  </div>
+                  {showSpinner && (
+                    <div className="flex items-center gap-3 rounded-lg border border-indigo-100 bg-indigo-50/90 p-2.5">
+                      <LoadingSpinner />
+                      <div className="flex-1">
+                        <p className="text-[11px] font-semibold text-indigo-900">
+                          AI is working...
+                        </p>
+                        {aiThinking && (
+                          <p className="text-[10px] text-indigo-700">
+                            {aiThinking}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {clientError && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-2.5">
+                      <p className="text-[10px] text-red-700">{clientError}</p>
+                    </div>
                   )}
                 </div>
               </div>
             )}
+          </div>
 
-            {clientError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-                <p className="text-sm text-red-700">{clientError}</p>
-              </div>
-            )}
+          {/* Bottom pinned actions */}
+          <div className="border-t border-slate-200/80 bg-slate-50/95 px-4 py-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-[9px] text-slate-500">
+              <span>
+                {pendingCount > 0
+                  ? `${pendingCount} pending change${
+                      pendingCount === 1 ? "" : "s"
+                    }`
+                  : "No pending changes"}
+              </span>
+              <PublishingStatus
+                state={publishState}
+                changeCount={pendingCount}
+                message={statusMessage || undefined}
+                onPublish={handlePublish}
+                onViewLive={() =>
+                  window.open(
+                    `https://${site.githubOwner}.github.io/${site.githubRepo}/`,
+                    "_blank"
+                  )
+                }
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              {/* Reuse existing ApprovalButtons behavior; styling primarily handled by surrounding layout */}
+              <ApprovalButtons
+                onPublish={handlePublish}
+                onReset={handleReset}
+                disabled={disablePublish}
+                changeCount={pendingCount}
+              />
+            </div>
           </div>
         </div>
+      </aside>
 
-        {/* Right Column: Site Preview */}
-        <div className="w-3/5 overflow-y-auto">
+      {/* Right side preview */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 overflow-y-auto p-6">
           <SitePreview
             siteId={site.id}
             currentHTML={previewHTML}
