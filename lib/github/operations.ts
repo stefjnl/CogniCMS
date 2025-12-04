@@ -1,9 +1,9 @@
-import { RequestError } from "@octokit/request-error";
 import { createOctokit } from "@/lib/github/client";
 import { resolveToken } from "@/lib/storage/sites";
-import { SiteConfig } from "@/types/site";
-import { GitHubContent, PublishResult } from "@/types/github";
 import { withRetry } from "@/lib/utils/retry";
+import { GitHubContent, PublishResult } from "@/types/github";
+import { SiteConfig } from "@/types/site";
+import { RequestError } from "@octokit/request-error";
 
 function normalizeOwner(owner: string): string {
   let value = owner.trim();
@@ -73,19 +73,31 @@ function normalizeRepo(repo: string): string {
   return repoSegment.replace(/\.git$/i, "");
 }
 
+export interface GetFileContentOptions {
+  /**
+   * When true, bypasses local development cache and fetches directly from GitHub.
+   * Use this when you need the actual remote state (e.g., "Sync from GitHub" feature).
+   */
+  forceRemote?: boolean;
+}
+
 export async function getFileContent(
   site: SiteConfig,
-  path: string
+  path: string,
+  options: GetFileContentOptions = {}
 ): Promise<GitHubContent> {
+  const { forceRemote = false } = options;
+
   console.log("[GET_FILE_CONTENT] Fetching file:", path);
   console.log(
     "[GET_FILE_CONTENT] Repository:",
     `${site.githubOwner}/${site.githubRepo}`
   );
   console.log("[GET_FILE_CONTENT] Branch:", site.githubBranch);
+  console.log("[GET_FILE_CONTENT] Force remote:", forceRemote);
 
-  // Development mode: Load from local examples folder
-  if (process.env.NODE_ENV === "development" && site.githubRepo === "zincafe-zweeloo") {
+  // Development mode: Load from local examples folder (unless forceRemote is true)
+  if (!forceRemote && process.env.NODE_ENV === "development" && site.githubRepo === "zincafe-zweeloo") {
     try {
       console.log("[GET_FILE_CONTENT] Development mode: Loading from examples folder");
       const fs = await import("fs/promises");

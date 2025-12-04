@@ -1,17 +1,19 @@
 "use client";
 
-import Link from "next/link";
 import { SiteConfig } from "@/types/site";
+import Link from "next/link";
 import { useState } from "react";
 
 interface SiteHeaderProps {
   site: SiteConfig;
   lastSynced: string;
   onRescan?: () => Promise<void>;
+  onSyncFromGitHub?: () => Promise<void>;
 }
 
-export function SiteHeader({ site, lastSynced, onRescan }: SiteHeaderProps) {
+export function SiteHeader({ site, lastSynced, onRescan, onSyncFromGitHub }: SiteHeaderProps) {
   const [isRescanning, setIsRescanning] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const handleRescan = async () => {
     if (isRescanning || !onRescan) return;
@@ -21,6 +23,17 @@ export function SiteHeader({ site, lastSynced, onRescan }: SiteHeaderProps) {
       await onRescan();
     } finally {
       setIsRescanning(false);
+    }
+  };
+
+  const handleSyncFromGitHub = async () => {
+    if (isSyncing || !onSyncFromGitHub) return;
+
+    setIsSyncing(true);
+    try {
+      await onSyncFromGitHub();
+    } finally {
+      setIsSyncing(false);
     }
   };
   return (
@@ -35,6 +48,27 @@ export function SiteHeader({ site, lastSynced, onRescan }: SiteHeaderProps) {
         </p>
       </div>
       <div className="flex items-center gap-2 text-sm">
+        <button
+          onClick={handleSyncFromGitHub}
+          disabled={isSyncing}
+          className="rounded-md bg-emerald-600 px-3 py-2 font-medium text-white shadow hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          title="Fetch latest content from GitHub (source of truth)"
+        >
+          <svg
+            className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
+            />
+          </svg>
+          {isSyncing ? "Syncing..." : "Sync from GitHub"}
+        </button>
         <button
           onClick={handleRescan}
           disabled={isRescanning}

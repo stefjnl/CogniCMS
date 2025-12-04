@@ -11,8 +11,8 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { StatusBar } from "@/components/ui/StatusBar";
 import { getPageDefinitionForSiteConfig } from "@/lib/config/page-definition-resolver";
 import {
-    siteDefinitionConfig,
-    ZincafeLandingPageDefinition,
+  siteDefinitionConfig,
+  ZincafeLandingPageDefinition,
 } from "@/lib/config/site-definitions";
 import { diffWebsiteContent } from "@/lib/content/differ";
 import { usePreviewUpdate, usePublishHandler } from "@/lib/hooks";
@@ -20,13 +20,26 @@ import { buildCommitMessage } from "@/lib/utils/commit";
 import { useEditorShortcuts } from "@/lib/utils/keyboard";
 import { PreviewChange, WebsiteContent } from "@/types/content";
 import {
-    PageDefinition,
-    SiteConfigWithPageDefinition,
+  PageDefinition,
+  SiteConfigWithPageDefinition,
 } from "@/types/content-schema";
 import { SiteConfig } from "@/types/site";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+// Helper to generate trace IDs - fallback for browsers without crypto.randomUUID
+function generateTraceId(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for older browsers or non-secure contexts
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 interface ChatInterfaceProps {
   site: SiteConfig;
@@ -328,7 +341,7 @@ Section contents: ${JSON.stringify(section.content, null, 2)}`;
           { text: message },
           {
             headers: {
-              "X-Trace-Id": crypto.randomUUID(),
+              "X-Trace-Id": generateTraceId(),
             },
           }
         );
@@ -376,7 +389,7 @@ Section contents: ${JSON.stringify(section.content, null, 2)}`;
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Trace-Id": crypto.randomUUID(),
+          "X-Trace-Id": generateTraceId(),
         },
       });
 
@@ -390,7 +403,7 @@ Section contents: ${JSON.stringify(section.content, null, 2)}`;
       // Fetch the updated content
       const contentResponse = await fetch(`/api/content/${site.id}`, {
         headers: {
-          "X-Trace-Id": crypto.randomUUID(),
+          "X-Trace-Id": generateTraceId(),
         },
       });
 
@@ -414,6 +427,45 @@ Section contents: ${JSON.stringify(section.content, null, 2)}`;
     } catch (error) {
       console.error("[RESCAN] Error:", error);
       setClientError(`Re-scan failed: ${(error as Error).message}`);
+    }
+  }, [site.id]);
+
+  // Sync from GitHub - fetch latest content from remote (source of truth)
+  const handleSyncFromGitHub = useCallback(async () => {
+    try {
+      console.log("[SYNC] Starting sync from GitHub...");
+
+      const response = await fetch(`/api/content/${site.id}/sync`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Trace-Id": generateTraceId(),
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Sync failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log("[SYNC] Sync complete:", result.message);
+
+      // Update the UI state with fresh content from GitHub
+      setDraftContent(result.content);
+      baselineRef.current = result.content;
+      setPreviewChanges([]);
+      setCommitMessage("[CogniCMS] Content update");
+
+      // Update current HTML if available - this will trigger preview regeneration
+      if (result.html) {
+        setCurrentHTML(result.html);
+      }
+
+      alert(`✅ Sync complete! Loaded latest content from GitHub with ${result.content.sections.length} sections.`);
+    } catch (error) {
+      console.error("[SYNC] Error:", error);
+      setClientError(`Sync from GitHub failed: ${(error as Error).message}`);
     }
   }, [site.id]);
 
@@ -726,6 +778,7 @@ Section contents: ${JSON.stringify(section.content, null, 2)}`;
               site={site}
               lastSynced={lastModified}
               onRescan={handleRescan}
+              onSyncFromGitHub={handleSyncFromGitHub}
             />
             <div className="mt-3">
               <StatusBar

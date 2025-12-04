@@ -3,9 +3,38 @@
     "title": "Zincafé Zweeloo - Gesprekken die ertoe doen",
     "description": "Zincafé Zweeloo - Filosofische gesprekken over zingeving in Zweeloo. Vijf bijeenkomsten per jaar begeleid door ervaren facilitators.",
     "lastModified": "2025-12-04T12:00:00.000Z",
-    "schemaVersion": "1.0"
+    "schemaVersion": "1.0",
+    "ogTitle": "Zincafé Zweeloo - Gesprekken die ertoe doen",
+    "ogDescription": "Filosofische gesprekken over zingeving in Zweeloo. Vijf bijeenkomsten per jaar begeleid door ervaren facilitators.",
+    "ogImage": "image.jpg",
+    "ogUrl": "https://zincafe-zweeloo.nl",
+    "canonicalUrl": "https://zincafe-zweeloo.nl",
+    "email": "zincafezweeloo@gmail.com"
   },
   "sections": [
+    {
+      "id": "header",
+      "label": "Header / Hero",
+      "type": "hero",
+      "content": {
+        "heading": "Zincafé Zweeloo",
+        "subtitle": "Gesprekken die ertoe doen",
+        "ctaText": "Blijf op de hoogte",
+        "ctaHref": "#newsletter",
+        "urgencyText": "⏰ Volgende bijeenkomst over 17 dagen"
+      },
+      "selector": "header"
+    },
+    {
+      "id": "next-event-banner",
+      "label": "Eerstvolgende Bijeenkomst Banner",
+      "type": "content",
+      "content": {
+        "heading": "🗓️ Eerstvolgende bijeenkomst: 27 november 2025",
+        "subtext": "Nog beperkt aantal plaatsen beschikbaar"
+      },
+      "selector": ".next-event-banner"
+    },
     {
       "id": "intro",
       "label": "Introductie - Waarom een Zincafé",
@@ -172,6 +201,29 @@
         ]
       },
       "selector": "section.contact"
+    },
+    {
+      "id": "newsletter",
+      "label": "Nieuwsbrief",
+      "type": "content",
+      "content": {
+        "heading": "Blijf op de hoogte via onze nieuwsbrief",
+        "description": "Ontvang een seintje wanneer nieuwe data bekend zijn en mis geen enkele bijeenkomst",
+        "buttonText": "Inschrijven",
+        "placeholderText": "jouw@email.nl",
+        "privacyNote": "We mailen maximaal 1x per maand. Geen spam, uitschrijven altijd mogelijk."
+      },
+      "selector": "section.newsletter"
+    },
+    {
+      "id": "footer",
+      "label": "Footer",
+      "type": "footer",
+      "content": {
+        "text": "Zincafé Zweeloo – Gesprekken over zingeving in Zweeloo",
+        "email": "zincafezweeloo@gmail.com"
+      },
+      "selector": "footer"
     }
   ],
   "assets": {
