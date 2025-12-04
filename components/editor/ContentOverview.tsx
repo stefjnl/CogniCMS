@@ -1,29 +1,25 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { WebsiteContent, WebsiteSection, PreviewChange, SectionType } from "@/types/content";
 import {
-  PageDefinition,
-  MetadataFieldDefinition,
-  SectionDefinition,
-  FieldDefinition,
-} from "@/types/content-schema";
-import {
-  Input,
-  Textarea,
-  Label,
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
+    Input,
+    Label,
+    Textarea
 } from "@/components/ui";
+import { Button } from "@/components/ui/Button";
 import {
-  inferFieldMetadata,
-  shouldUseModalEditor,
+    inferFieldMetadata,
+    shouldUseModalEditor,
 } from "@/lib/utils/fieldMetadata";
+import { PreviewChange, SectionType, WebsiteContent, WebsiteSection } from "@/types/content";
+import {
+    FieldDefinition,
+    MetadataFieldDefinition,
+    PageDefinition,
+    SectionDefinition,
+} from "@/types/content-schema";
+import { useMemo, useState } from "react";
 import { FieldEditor } from "./FieldEditor";
 import { ListItemEditor } from "./ListItemEditor";
-import { Button } from "@/components/ui/Button";
 
 const SECTION_TYPE_VALUES: SectionType[] = [
   "hero",
