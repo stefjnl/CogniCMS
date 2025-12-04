@@ -82,16 +82,38 @@ function extractMessageContent(message: UIMessage): string {
   return segments.join("\n\n");
 }
 
+interface ClarificationOption {
+  number: string;
+  label: string;
+  currentValue: string;
+}
+
+function parseOptions(message: string): ClarificationOption[] | null {
+  // Match patterns like: "1. Page title (browser tab/SEO) - currently: 'Old Title'"
+  const optionRegex = /(\d+)\.\s+(.+?)\s+-\s+currently:\s+['"']([^'"']+)['"']/g;
+  const matches = [...message.matchAll(optionRegex)];
+
+  if (matches.length === 0) return null;
+
+  return matches.map(match => ({
+    number: match[1],
+    label: match[2].trim(),
+    currentValue: match[3],
+  }));
+}
+
 interface MessageListProps {
   messages: UIMessage[];
   changes?: PreviewChange[];
   lastAssistantMessageId?: string | null;
+  onOptionClick?: (optionNumber: string) => void;
 }
 
 export function MessageList({
   messages,
   changes = [],
   lastAssistantMessageId,
+  onOptionClick,
 }: MessageListProps) {
   // Empty state when no messages
   if (messages.length === 0) {
@@ -136,6 +158,9 @@ export function MessageList({
           role === "assistant" && message.id === lastAssistantMessageId;
         const showChanges = isLastAssistant && changes.length > 0;
 
+        // Parse clarification options if this is an AI message
+        const options = role === "assistant" ? parseOptions(content) : null;
+
         return (
           <div key={message.id} className="space-y-3">
             <div
@@ -153,6 +178,26 @@ export function MessageList({
                 <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
                   {content}
                 </div>
+
+                {/* Render clickable options if found */}
+                {options && options.length > 0 && onOptionClick && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {options.map((opt) => (
+                      <button
+                        key={opt.number}
+                        onClick={() => onOptionClick(opt.number)}
+                        className="text-sm px-3 py-2 rounded-lg bg-white border border-gray-300
+                                   hover:border-indigo-500 hover:bg-indigo-50 text-left
+                                   transition-colors shadow-sm"
+                      >
+                        <span className="font-medium text-gray-900">{opt.label}</span>
+                        <span className="block text-xs text-gray-500 truncate max-w-[200px] mt-0.5">
+                          Currently: {opt.currentValue}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

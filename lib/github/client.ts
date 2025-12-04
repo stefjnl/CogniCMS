@@ -1,5 +1,5 @@
+import { config, validateProductionConfig } from "@/lib/config";
 import { Octokit } from "@octokit/rest";
-import { config } from "@/lib/config";
 
 /**
  * Create a GitHub Octokit client.
@@ -8,6 +8,13 @@ import { config } from "@/lib/config";
  * This keeps GitHub access centralized and type-safe.
  */
 export function createOctokit(token?: string): Octokit {
+  // Only validate production config when falling back to global token.
+  // When an explicit token is provided (e.g., from a site's encrypted token),
+  // we don't need a global GITHUB_TOKEN environment variable.
+  if (!token) {
+    validateProductionConfig();
+  }
+  
   const resolvedToken = token ?? config.github.token;
 
   if (!resolvedToken) {

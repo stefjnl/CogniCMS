@@ -173,12 +173,19 @@ const rateLimit = rateLimitSchema.parse({
   upstashRedisRestToken: rawEnv.UPSTASH_REDIS_REST_TOKEN,
 });
 
-if (nodeEnv === "production") {
-  if (!github.token) {
-    throw new Error(
-      "Missing required environment variable GITHUB_TOKEN in production."
-    );
-  }
+/**
+ * Validate production-only requirements at runtime, not at module load time.
+ * This prevents build-time failures when environment variables are only needed at runtime.
+ * Call this function in API routes or server actions before using sensitive config values.
+ *
+ * Note: GITHUB_TOKEN is NOT required globally since each site stores its own encrypted token.
+ * The global token is only used as an optional fallback.
+ */
+export function validateProductionConfig(): void {
+  if (nodeEnv !== "production") return;
+
+  // Note: GITHUB_TOKEN is optional - sites use their own encrypted tokens
+  // The global token is only a fallback for operations without a site context
 
   if (!auth.sessionSecret) {
     throw new Error(

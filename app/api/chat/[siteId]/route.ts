@@ -44,11 +44,15 @@ export async function POST(
   const raw = await request.json();
   const parsed = chatMessageSchema.parse(raw) as ChatRequestBody;
 
+  // Extract systemContext if provided
+  const systemContext = parsed.systemContext as string | undefined;
+
   const result = await executeChat(parsed, {
     siteId,
     traceId,
     conversationId,
     messageId,
+    systemContext,
   });
 
   const response = result.toUIMessageStreamResponse({

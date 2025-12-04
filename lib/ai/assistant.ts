@@ -1,23 +1,23 @@
-import { z } from "zod";
-import {
-  streamText,
-  convertToModelMessages,
-  stepCountIs,
-  type UIMessage,
-} from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
 import { buildSystemPrompt } from "@/lib/ai/prompts";
 import {
-  applyToolActions,
-  toolPlanSchema,
-  type ToolAction,
+    applyToolActions,
+    toolPlanSchema,
+    type ToolAction,
 } from "@/lib/ai/tools";
-import { getSiteConfig } from "@/lib/storage/sites";
 import { getFileContent } from "@/lib/github/operations";
-import { SiteConfig } from "@/types/site";
-import { WebsiteContent } from "@/types/content";
 import { setDraftContent } from "@/lib/storage/cache";
+import { getSiteConfig } from "@/lib/storage/sites";
 import { buildTraceLogger } from "@/lib/utils/trace";
+import { WebsiteContent } from "@/types/content";
+import { SiteConfig } from "@/types/site";
+import { createOpenAI } from "@ai-sdk/openai";
+import {
+    convertToModelMessages,
+    stepCountIs,
+    streamText,
+    type UIMessage,
+} from "ai";
+import { z } from "zod";
 
 export interface ChatRequestBody {
   id?: string;
@@ -31,6 +31,7 @@ export interface ChatExecutionContext {
   traceId: string;
   conversationId: string;
   messageId: string;
+  systemContext?: string;
 }
 
 async function loadSiteContent(
@@ -70,7 +71,7 @@ export async function executeChat(
   context: ChatExecutionContext
 ) {
   const { site, content } = await loadSiteContent(context.siteId);
-  const systemPrompt = buildSystemPrompt(site, content);
+  const systemPrompt = buildSystemPrompt(site, content, context.systemContext);
 
   const logger = buildTraceLogger("ChatExecutor", context.traceId);
   let workingDraft = structuredClone(content);
@@ -123,11 +124,43 @@ export async function executeChat(
         hasToolResults: toolResults && toolResults.length > 0,
       });
     },
-    onFinish: async ({ steps }) => {
+    onFinish: async ({ steps, text }) => {
+      const toolCallCount = steps.flatMap((step) => step.toolCalls).length;
+      const lastUserMessage = body.messages?.[body.messages.length - 1];
+      
+      // Extract text content from message parts
+      const getMessageContent = (msg: UIMessage | undefined) => {
+        if (!msg || msg.role !== "user") return null;
+        if (!msg.parts || msg.parts.length === 0) return null;
+        
+        return msg.parts
+          .map((part: any) => {
+            if (part.type === "text" && typeof part.text === "string") {
+              return part.text;
+            }
+            return "";
+          })
+          .filter(Boolean)
+          .join(" ");
+      };
+
       logger("response-complete", {
         totalSteps: steps.length,
-        toolCallCount: steps.flatMap((step) => step.toolCalls).length,
+        toolCallCount,
+        hasToolCalls: toolCallCount > 0,
+        hasTextOnly: text && toolCallCount === 0,
+        lastUserMessageContent: getMessageContent(lastUserMessage),
+        systemContextPresent: !!context.systemContext,
       });
+
+      // Debug log for clarification issue
+      if (toolCallCount === 0 && text) {
+        logger("warning-no-tool-calls", {
+          message: "AI responded with text only, no tool calls",
+          responseTextPreview: text.substring(0, 200),
+          lastUserMessage: getMessageContent(lastUserMessage),
+        });
+      }
     },
     onError: async ({ error }) => {
       logger("error", { error: (error as Error).message });

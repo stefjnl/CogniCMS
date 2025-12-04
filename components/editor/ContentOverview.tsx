@@ -22,6 +22,7 @@ import {
   shouldUseModalEditor,
 } from "@/lib/utils/fieldMetadata";
 import { FieldEditor } from "./FieldEditor";
+import { ListItemEditor } from "./ListItemEditor";
 import { Button } from "@/components/ui/Button";
 
 const SECTION_TYPE_VALUES: SectionType[] = [
@@ -87,6 +88,8 @@ interface ContentOverviewProps {
   } | null;
   onSaveEdit?: (sectionId: string, field: string, newValue: unknown) => void;
   onCancelEdit?: () => void;
+  onSelectSection?: (sectionId: string | null) => void;
+  selectedSectionId?: string | null;
   showOnlyMetadata?: boolean;
   showOnlySections?: boolean;
 }
@@ -99,6 +102,8 @@ export function ContentOverview({
   editingField,
   onSaveEdit,
   onCancelEdit,
+  onSelectSection,
+  selectedSectionId,
   showOnlyMetadata = false,
   showOnlySections = false,
 }: ContentOverviewProps) {
@@ -312,6 +317,37 @@ export function ContentOverview({
       def.type === "faq" ||
       def.type === "json"
     ) {
+      // Check if the value is an array of objects - use ListItemEditor
+      if (Array.isArray(rawValue) && rawValue.length > 0 && typeof rawValue[0] === "object") {
+        return (
+          <div key={key}>
+            <ListItemEditor
+              items={rawValue as Record<string, unknown>[]}
+              fieldLabel={def.label}
+              fieldDescription={def.description}
+              onChange={(newItems) => handleChange(newItems)}
+              isPending={pending}
+            />
+          </div>
+        );
+      }
+      
+      // Check if it's an empty array - still use ListItemEditor for add capability
+      if (Array.isArray(rawValue) && rawValue.length === 0) {
+        return (
+          <div key={key}>
+            <ListItemEditor
+              items={[]}
+              fieldLabel={def.label}
+              fieldDescription={def.description}
+              onChange={(newItems) => handleChange(newItems)}
+              isPending={pending}
+            />
+          </div>
+        );
+      }
+      
+      // Fallback to textarea for string/other values
       const stringValue =
         typeof rawValue === "string"
           ? rawValue
@@ -481,15 +517,23 @@ export function ContentOverview({
             const isModified = pendingChanges.some(
               (c) => c.sectionId === section.id
             );
+            const isSelected = selectedSectionId === section.id;
 
             return (
               <section
                 key={section.id}
-                className="rounded-lg border border-slate-100 bg-slate-50/40 hover:bg-slate-50/80 transition-colors overflow-hidden"
+                className={`rounded-lg border overflow-hidden transition-colors ${
+                  isSelected
+                    ? "border-indigo-400 bg-indigo-50/60 hover:bg-indigo-50/80"
+                    : "border-slate-100 bg-slate-50/40 hover:bg-slate-50/80"
+                }`}
               >
                 <header
                   className="flex items-center justify-between px-2.5 py-1.5 cursor-pointer"
-                  onClick={() => toggleSection(section.id)}
+                  onClick={() => {
+                    toggleSection(section.id);
+                    onSelectSection?.(isSelected ? null : section.id);
+                  }}
                 >
                   <div className="flex items-center gap-1.5">
                     <span className="text-[11px] font-semibold text-slate-800">
@@ -533,6 +577,33 @@ export function ContentOverview({
                               section.id,
                               key
                             );
+                            
+                            // Check if this is an array of objects - use ListItemEditor
+                            const isArrayOfObjects = Array.isArray(value) && 
+                              (value.length === 0 || (value.length > 0 && typeof value[0] === "object" && value[0] !== null));
+                            
+                            if (isArrayOfObjects) {
+                              return (
+                                <div
+                                  key={key}
+                                  className={`p-1.5 rounded-md ${
+                                    isPending
+                                      ? "bg-amber-50/80 border border-amber-200"
+                                      : "bg-slate-50/60"
+                                  }`}
+                                >
+                                  <ListItemEditor
+                                    items={value as Record<string, unknown>[]}
+                                    fieldLabel={key}
+                                    onChange={(newItems) =>
+                                      onSaveEdit?.(section.id, key, newItems)
+                                    }
+                                    isPending={isPending}
+                                  />
+                                </div>
+                              );
+                            }
+                            
                             const metadata = inferFieldMetadata(
                               section.id,
                               key,

@@ -79,6 +79,7 @@ export function ChatInterface({
     editMode: "inline" | "modal";
   } | null>(null);
   const [activeTab, setActiveTab] = useState<"metadata" | "sections" | "chat">("sections");
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const baselineRef = useRef<WebsiteContent>(initialContent);
   const pendingRefreshRef = useRef(false);
 
@@ -131,12 +132,42 @@ export function ChatInterface({
     },
   });
 
+  // Build system context based on selected section
+  const systemContext = useMemo(() => {
+    let context = "";
+
+    if (selectedSectionId && draftContent) {
+      const sectionsArray = Array.isArray(draftContent.sections)
+        ? draftContent.sections
+        : Object.entries(draftContent.sections).map(
+            ([id, section]: [string, any]) => ({
+              id,
+              label: section.label || id,
+              type: section.type || "content",
+              content: section.content || section,
+            })
+          );
+
+      const section = sectionsArray.find(s => s.id === selectedSectionId);
+      if (section) {
+        context = `USER CONTEXT: The user is currently viewing the "${section.label}" section (ID: ${section.id}).
+If they refer to "the heading", "the title", "the text", etc. without specification, assume they mean this section.
+Section contents: ${JSON.stringify(section.content, null, 2)}`;
+      }
+    }
+
+    return context;
+  }, [selectedSectionId, draftContent]);
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: `/api/chat/${site.id}`,
+        body: {
+          systemContext,
+        },
       }),
-    [site.id]
+    [site.id, systemContext]
   );
 
   const {
@@ -273,6 +304,13 @@ export function ChatInterface({
       }
     },
     [clearError, sendMessage]
+  );
+
+  const handleOptionClick = useCallback(
+    async (optionNumber: string) => {
+      await handleSend(optionNumber);
+    },
+    [handleSend]
   );
 
   const handleReset = useCallback(async () => {
@@ -714,6 +752,8 @@ export function ChatInterface({
                 editingField={editingField}
                 onSaveEdit={handleSaveEdit}
                 onCancelEdit={handleCancelEdit}
+                onSelectSection={setSelectedSectionId}
+                selectedSectionId={selectedSectionId}
                 showOnlyMetadata={true}
               />
             )}
@@ -727,6 +767,8 @@ export function ChatInterface({
                 editingField={editingField}
                 onSaveEdit={handleSaveEdit}
                 onCancelEdit={handleCancelEdit}
+                onSelectSection={setSelectedSectionId}
+                selectedSectionId={selectedSectionId}
                 showOnlySections={true}
               />
             )}
@@ -739,6 +781,7 @@ export function ChatInterface({
                     messages={visibleMessages}
                     changes={previewChanges}
                     lastAssistantMessageId={lastAppliedAssistantId}
+                    onOptionClick={handleOptionClick}
                   />
                 </div>
 
