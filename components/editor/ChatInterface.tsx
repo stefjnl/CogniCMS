@@ -4,27 +4,26 @@ import { ApprovalButtons } from "@/components/editor/ApprovalButtons";
 import { ContentOverview } from "@/components/editor/ContentOverview";
 import { MessageInput } from "@/components/editor/MessageInput";
 import { MessageList } from "@/components/editor/MessageList";
-import { PreviewPanel } from "@/components/editor/PreviewPanel";
 import { PublishingStatus } from "@/components/editor/PublishingStatus";
 import { SiteHeader } from "@/components/editor/SiteHeader";
 import { SitePreview } from "@/components/editor/SitePreview";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { StatusBar } from "@/components/ui/StatusBar";
+import { getPageDefinitionForSiteConfig } from "@/lib/config/page-definition-resolver";
+import {
+    siteDefinitionConfig,
+    ZincafeLandingPageDefinition,
+} from "@/lib/config/site-definitions";
 import { diffWebsiteContent } from "@/lib/content/differ";
 import { usePreviewUpdate, usePublishHandler } from "@/lib/hooks";
 import { buildCommitMessage } from "@/lib/utils/commit";
 import { useEditorShortcuts } from "@/lib/utils/keyboard";
 import { PreviewChange, WebsiteContent } from "@/types/content";
-import { SiteConfig } from "@/types/site";
 import {
-  PageDefinition,
-  SiteConfigWithPageDefinition,
+    PageDefinition,
+    SiteConfigWithPageDefinition,
 } from "@/types/content-schema";
-import {
-  siteDefinitionConfig,
-  ZincafeLandingPageDefinition,
-} from "@/lib/config/site-definitions";
-import { getPageDefinitionForSiteConfig } from "@/lib/config/page-definition-resolver";
+import { SiteConfig } from "@/types/site";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";

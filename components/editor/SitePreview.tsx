@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { PreviewChange } from "@/types/content";
 import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { PreviewChange } from "@/types/content";
+import { useEffect, useRef } from "react";
 
 interface SitePreviewProps {
   siteId: string;
@@ -122,7 +122,7 @@ export function SitePreview({
             ref={iframeRef}
             srcDoc={currentHTML}
             sandbox="allow-same-origin allow-scripts"
-            className="h-[800px] w-full border-0"
+            className="h-[1040px] w-full border-0"
             title="Site Preview"
             onLoad={() => {
               console.log("[SITE_PREVIEW] iframe loaded");
