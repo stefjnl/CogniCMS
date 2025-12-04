@@ -80,8 +80,43 @@ export function ChatInterface({
   } | null>(null);
   const [activeTab, setActiveTab] = useState<"metadata" | "sections" | "chat">("sections");
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(480); // Default width doubled from ~240 to 480
+  const [isResizing, setIsResizing] = useState(false);
   const baselineRef = useRef<WebsiteContent>(initialContent);
   const pendingRefreshRef = useRef(false);
+  const sidebarRef = useRef<HTMLElement>(null);
+
+  // Handle sidebar resize
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      const newWidth = Math.min(Math.max(e.clientX, 320), 800); // Min 320px, Max 800px
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing]);
 
   // Resolve active PageDefinition for this site/html using the config-only resolver.
   const pageDefinition: PageDefinition | null = useMemo(() => {
@@ -680,7 +715,11 @@ Section contents: ${JSON.stringify(section.content, null, 2)}`;
   return (
     <div className="flex h-screen bg-slate-50">
       {/* Left sidebar */}
-      <aside className="w-[380px] xl:w-[420px] bg-slate-50/80 border-r border-slate-200/80 backdrop-blur-md">
+      <aside 
+        ref={sidebarRef}
+        style={{ width: sidebarWidth }}
+        className="bg-slate-50/80 border-r border-slate-200/80 backdrop-blur-md flex-shrink-0 relative"
+      >
         <div className="h-screen sticky top-0 flex flex-col">
           {/* Header + status */}
           <div className="px-4 pt-4 pb-2 border-b border-slate-200/70 bg-white/70 backdrop-blur-sm">
@@ -856,6 +895,15 @@ Section contents: ${JSON.stringify(section.content, null, 2)}`;
             </div>
           </div>
         </div>
+        {/* Resize handle */}
+        <div
+          onMouseDown={handleMouseDown}
+          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-indigo-400 transition-colors ${
+            isResizing ? 'bg-indigo-500' : 'bg-transparent hover:bg-indigo-300'
+          }`}
+          style={{ touchAction: 'none' }}
+          title="Drag to resize"
+        />
       </aside>
 
       {/* Right side preview */}
