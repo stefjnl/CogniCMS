@@ -1,9 +1,9 @@
-import { notFound, redirect } from "next/navigation";
 import { ChatInterface } from "@/components/editor/ChatInterface";
-import { getSession } from "@/lib/utils/auth";
-import { getSiteConfig } from "@/lib/storage/sites";
+import { config } from "@/lib/config";
 import { getFileContent } from "@/lib/github/operations";
-import { WebsiteContent } from "@/types/content";
+import { getSiteConfig } from "@/lib/storage/sites";
+import { getSession } from "@/lib/utils/auth";
+import { notFound, redirect } from "next/navigation";
 
 interface EditorPageProps {
   params: Promise<{
@@ -24,22 +24,18 @@ export default async function EditorPage({ params }: EditorPageProps) {
     notFound();
   }
 
-  // Fetch the current HTML file for preview
+  // Fetch the current HTML file (source of truth)
   const htmlFile = await getFileContent(site, site.htmlFile);
   const currentHTML = htmlFile.content;
 
-  // Load content from content.json (the source of truth for editing)
-  let content: WebsiteContent;
-  try {
-    const contentFile = await getFileContent(site, site.contentFile);
-    content = JSON.parse(contentFile.content) as WebsiteContent;
-    console.log("[EDITOR_PAGE] Loaded content from content.json");
-  } catch (error) {
-    // Fallback: extract from HTML if content.json doesn't exist
-    console.log("[EDITOR_PAGE] content.json not found, extracting from HTML");
-    const { extractContentFromHtml } = await import("@/lib/content/extractor");
-    content = extractContentFromHtml(currentHTML);
-  }
+  // Extract content from HTML (HTML is the single source of truth)
+  // content.json is maintained via publishing, but we always work from HTML
+  const { extractContentFromHtml } = await import("@/lib/content/extractor");
+  const content = extractContentFromHtml(currentHTML, {
+    htmlFilePath: site.htmlFile,
+    siteConfig: site,
+  });
+  console.log("[EDITOR_PAGE] Content extracted from HTML (source of truth)");
 
   return (
     <div className="h-screen overflow-hidden bg-slate-50">
@@ -48,6 +44,7 @@ export default async function EditorPage({ params }: EditorPageProps) {
         initialContent={content}
         initialHTML={currentHTML}
         lastModified={site.lastModified}
+        aiModel={config.ai?.nanoGpt?.model ?? process.env.NANOGPT_MODEL}
       />
     </div>
   );

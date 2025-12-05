@@ -12,17 +12,17 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { StatusBar } from "@/components/ui/StatusBar";
 import { getPageDefinitionForSiteConfig } from "@/lib/config/page-definition-resolver";
 import {
-  siteDefinitionConfig,
-  ZincafeLandingPageDefinition,
+    siteDefinitionConfig,
+    ZincafeLandingPageDefinition,
 } from "@/lib/config/site-definitions";
 import { diffWebsiteContent } from "@/lib/content/differ";
-import { usePreviewUpdate, usePublishHandler, useContentHistory } from "@/lib/hooks";
+import { useContentHistory, usePreviewUpdate, usePublishHandler } from "@/lib/hooks";
 import { buildCommitMessage } from "@/lib/utils/commit";
 import { useEditorShortcuts } from "@/lib/utils/keyboard";
 import { PreviewChange, WebsiteContent } from "@/types/content";
 import {
-  PageDefinition,
-  SiteConfigWithPageDefinition,
+    PageDefinition,
+    SiteConfigWithPageDefinition,
 } from "@/types/content-schema";
 import { SiteConfig } from "@/types/site";
 import { useChat } from "@ai-sdk/react";
@@ -47,6 +47,7 @@ interface ChatInterfaceProps {
   initialContent: WebsiteContent;
   initialHTML: string;
   lastModified: string;
+  aiModel?: string;
 }
 
 function parseJsonPlan(
@@ -73,6 +74,7 @@ export function ChatInterface({
   initialContent,
   initialHTML,
   lastModified,
+  aiModel,
 }: ChatInterfaceProps) {
   const [draftContent, setDraftContent] = useState<WebsiteContent | null>(
     initialContent
@@ -868,7 +870,10 @@ Section contents: ${JSON.stringify(section.content, null, 2)}`;
             <div className="mt-3">
               <StatusBar
                 gitHubConnected={true}
-                aiModel="z-ai/glm-4.6"
+                // Use prop if provided; otherwise use a public env variable set by the developer/build
+                aiModel={
+                  aiModel ?? process.env.NEXT_PUBLIC_NANOGPT_MODEL ?? "Not configured"
+                }
                 unpublishedChanges={pendingCount}
               />
             </div>

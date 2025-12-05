@@ -53,32 +53,31 @@ export async function GET(
     return addRateLimitHeaders(response, rateLimitResult.result);
   }
 
-  // No draft exists - load from content.json file
+  // No draft exists - extract from HTML (HTML is source of truth)
+  // Note: content.json is generated from HTML, not a source
   try {
-    console.log("[GET_CONTENT] No draft found, loading from content.json");
-    const file = await getFileContent(site, site.contentFile);
-    const content = JSON.parse(file.content) as WebsiteContent;
-    setDraftContent(site.id, content, {
-      traceId,
-      source: "content-route:get:content-json",
-    });
-    const response = NextResponse.json({ content, draft: false });
-    return addRateLimitHeaders(response, rateLimitResult.result);
-  } catch (error) {
-    // Fallback: extract from HTML if content.json doesn't exist
-    console.log("[GET_CONTENT] content.json not found, extracting from HTML");
+    console.log("[GET_CONTENT] No draft found, extracting from HTML (source of truth)");
     const htmlFile = await getFileContent(site, site.htmlFile);
     const { extractContentFromHtml } = await import("@/lib/content/extractor");
-    const extractedContent = extractContentFromHtml(htmlFile.content);
+    const extractedContent = extractContentFromHtml(htmlFile.content, {
+      htmlFilePath: site.htmlFile,
+      siteConfig: site,
+    });
     setDraftContent(site.id, extractedContent, {
       traceId,
-      source: "content-route:get:html-fallback",
+      source: "content-route:get:html-extraction",
     });
     const response = NextResponse.json({
       content: extractedContent,
       draft: false,
     });
     return addRateLimitHeaders(response, rateLimitResult.result);
+  } catch (error) {
+    console.error("[GET_CONTENT] Failed to extract content from HTML:", error);
+    return NextResponse.json(
+      { error: "Failed to load content from HTML", details: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    );
   }
 }
 

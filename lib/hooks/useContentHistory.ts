@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
 import { WebsiteContent } from "@/types/content";
+import { useCallback, useRef, useState } from "react";
 
 export interface HistoryEntry {
   content: WebsiteContent;

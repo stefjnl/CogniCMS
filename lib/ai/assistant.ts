@@ -4,6 +4,7 @@ import {
     toolPlanSchema,
     type ToolAction,
 } from "@/lib/ai/tools";
+import { config } from "@/lib/config";
 import { getFileContent } from "@/lib/github/operations";
 import { setDraftContent } from "@/lib/storage/cache";
 import { getSiteConfig } from "@/lib/storage/sites";
@@ -62,7 +63,13 @@ const nanoGptModel = (() => {
       "Content-Type": "application/json",
     },
   });
-  const modelId = process.env.NANOGPT_MODEL ?? "z-ai/glm-4.6";
+  // Prefer centralized server config, then environment variable. Explicit configuration is required.
+  const modelId = config.ai?.nanoGpt?.model ?? process.env.NANOGPT_MODEL;
+  if (!modelId) {
+    throw new Error(
+      "NANOGPT_MODEL is not configured. Please set NANOGPT_MODEL (server) and NEXT_PUBLIC_NANOGPT_MODEL (client) as needed."
+    );
+  }
   return provider.chat(modelId);
 })();
 

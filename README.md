@@ -68,6 +68,8 @@ Create `.env.local` with the following keys:
 | `SESSION_DURATION` | Session lifetime in hours (default: `24`)    |    ⚠️    |
 | `NANOGPT_API_KEY`  | Auth token for NanoGPT streaming completions |    ✅    |
 | `NANOGPT_BASE_URL` | Override NanoGPT host (optional)             |    ❌    |
+| `NANOGPT_MODEL`     | The LLM model identifier to use on server-side     |    ✅    |
+| `NEXT_PUBLIC_NANOGPT_MODEL` | (Optional) The public model id exposed to client for display and client-only usage |    ❌    |
 
 **Example `.env.local`:**
 
@@ -76,6 +78,8 @@ CMS_PASSWORD=your-secure-password
 SESSION_SECRET=a-long-random-string-min-32-chars
 SESSION_DURATION=24
 NANOGPT_API_KEY=your-nanogpt-api-key
+NANOGPT_MODEL=your-server-model-id
+NEXT_PUBLIC_NANOGPT_MODEL=your-client-model-id
 ```
 
 ### Adding a GitHub Pages Site

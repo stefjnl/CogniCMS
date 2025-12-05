@@ -193,6 +193,18 @@ export function validateProductionConfig(): void {
     );
   }
 
+  if (!ai.nanoGpt.model) {
+    throw new Error(
+      "Missing required environment variable NANOGPT_MODEL in production. AI features are unavailable without a configured model."
+    );
+  }
+
+  if (!ai.nanoGpt.apiKey) {
+    throw new Error(
+      "Missing required environment variable NANOGPT_API_KEY in production. AI features are unavailable without an API key."
+    );
+  }
+
   if (
     (sentry.dsn && !sentry.environment) ||
     (sentry.publicDsn && !sentry.publicEnvironment)

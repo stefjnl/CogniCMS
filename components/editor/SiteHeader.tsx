@@ -52,7 +52,7 @@ export function SiteHeader({ site, lastSynced, onRescan, onSyncFromGitHub }: Sit
           onClick={handleSyncFromGitHub}
           disabled={isSyncing}
           className="rounded-md bg-emerald-600 px-3 py-2 font-medium text-white shadow hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          title="Fetch latest content from GitHub (source of truth)"
+          title="Fetch latest HTML from GitHub and extract content (HTML is source of truth)"
         >
           <svg
             className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`}
@@ -73,7 +73,7 @@ export function SiteHeader({ site, lastSynced, onRescan, onSyncFromGitHub }: Sit
           onClick={handleRescan}
           disabled={isRescanning}
           className="rounded-md border border-slate-200 px-3 py-2 font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          title="Re-scan HTML to refresh content structure"
+          title="Re-extract content from current HTML in editor"
         >
           <svg
             className={`w-4 h-4 ${isRescanning ? "animate-spin" : ""}`}

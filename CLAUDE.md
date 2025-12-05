@@ -43,7 +43,8 @@ SESSION_SECRET=long-random-string
 SESSION_DURATION=24
 NANOGPT_API_KEY=sk-...
 NANOGPT_BASE_URL=https://nano-gpt.com/api/v1  # Optional, defaults to this
-NANOGPT_MODEL=z-ai/glm-4.6                     # Optional, defaults to this
+NANOGPT_MODEL=your-server-model-id            # REQUIRED - set the server-side model identifier (no default)
+NEXT_PUBLIC_NANOGPT_MODEL=your-client-model-id # Optional - exposes the model for client display/use
 ```
 
 ## Architecture
@@ -87,7 +88,7 @@ Content is represented as `WebsiteContent` (`types/content.ts`):
 **NanoGPT Integration** (`lib/ai/assistant.ts`):
 
 - Uses `@ai-sdk/openai` provider with custom `baseURL` pointing to NanoGPT
-- Default model: `z-ai/glm-4.6` (configurable via `NANOGPT_MODEL`)
+- Model: Configurable via `NANOGPT_MODEL` (server-side). There is no default model; this value must be set in server environment variables. Optionally, set `NEXT_PUBLIC_NANOGPT_MODEL` so the client can display the configured model.
 - System prompt dynamically generated per request, includes full content structure
 - Single tool: `applyUpdates` with actions array
 - Multi-step execution enabled via `stopWhen: stepCountIs(5)` for complex workflows
@@ -251,7 +252,7 @@ All API handlers follow this structure:
    curl -X POST https://nano-gpt.com/api/v1/chat/completions \
      -H "Authorization: Bearer $NANOGPT_API_KEY" \
      -H "Content-Type: application/json" \
-     -d '{"model":"z-ai/glm-4.6","messages":[{"role":"user","content":"hello"}],"stream":true}'
+     -d '{"model":"<your-model-id>","messages":[{"role":"user","content":"hello"}],"stream":true}'
    ```
 
 ### GitHub Integration Troubleshooting

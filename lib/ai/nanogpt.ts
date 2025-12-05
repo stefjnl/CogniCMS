@@ -1,3 +1,4 @@
+import { config } from "@/lib/config";
 import { buildTraceLogger } from "@/lib/utils/trace";
 
 export interface ChatMessage {
@@ -29,6 +30,10 @@ export async function createNanoGptRequest(
   const logger = buildTraceLogger("NanoGPT", traceId);
   logger("request", { messageCount: messages.length });
 
+  const model = config?.ai?.nanoGpt?.model ?? process.env.NANOGPT_MODEL;
+  if (!model) {
+    throw new Error("NANOGPT_MODEL is not configured. Please set NANOGPT_MODEL in the server environment.");
+  }
   const response = await fetch(API_URL, {
     method: "POST",
     headers: {
@@ -37,7 +42,7 @@ export async function createNanoGptRequest(
       "X-Trace-Id": traceId,
     },
     body: JSON.stringify({
-      model: "z-ai/glm-4.6",
+      model,
       stream: true,
       messages: messages.map(({ role, content }) => ({ role, content })),
     }),

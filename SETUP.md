@@ -36,6 +36,8 @@ Populate the following keys:
 | `SESSION_DURATION` | Session lifetime in hours (default `24`)     |
 | `NANOGPT_API_KEY`  | Auth token for NanoGPT streaming completions |
 | `NANOGPT_BASE_URL` | _(Optional)_ Override NanoGPT host           |
+| `NANOGPT_MODEL`     | The LLM model identifier to use (server-side, required) |
+| `NEXT_PUBLIC_NANOGPT_MODEL` | (Optional) client-exposed model id for display or client-only usage |
 
 > **Note:** GitHub tokens are encrypted per-site and stored via the runtime storage provider (`lib/storage/sites.ts`).
 
