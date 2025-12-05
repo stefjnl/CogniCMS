@@ -1,11 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
 import { extractContentFromHtml } from "@/lib/content/extractor";
 import { getFileContent } from "@/lib/github/operations";
+import { clearDraftContent, setDraftContent } from "@/lib/storage/cache";
 import { getSiteConfig } from "@/lib/storage/sites";
-import { setDraftContent, clearDraftContent } from "@/lib/storage/cache";
 import { requireSession } from "@/lib/utils/auth";
-import { withRateLimit, addRateLimitHeaders } from "@/lib/utils/ratelimit";
-import { WebsiteContent } from "@/types/content";
+import { addRateLimitHeaders, withRateLimit } from "@/lib/utils/ratelimit";
+import { NextRequest, NextResponse } from "next/server";
 
 // Note: Uses Node.js runtime due to HTML extraction with JSDOM
 export const runtime = "nodejs";
