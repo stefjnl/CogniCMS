@@ -7,6 +7,7 @@ import { MessageList } from "@/components/editor/MessageList";
 import { PublishingStatus } from "@/components/editor/PublishingStatus";
 import { SiteHeader } from "@/components/editor/SiteHeader";
 import { SitePreview } from "@/components/editor/SitePreview";
+import { UndoRedoControls } from "@/components/editor/UndoRedoControls";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { StatusBar } from "@/components/ui/StatusBar";
 import { getPageDefinitionForSiteConfig } from "@/lib/config/page-definition-resolver";
@@ -15,7 +16,7 @@ import {
   ZincafeLandingPageDefinition,
 } from "@/lib/config/site-definitions";
 import { diffWebsiteContent } from "@/lib/content/differ";
-import { usePreviewUpdate, usePublishHandler } from "@/lib/hooks";
+import { usePreviewUpdate, usePublishHandler, useContentHistory } from "@/lib/hooks";
 import { buildCommitMessage } from "@/lib/utils/commit";
 import { useEditorShortcuts } from "@/lib/utils/keyboard";
 import { PreviewChange, WebsiteContent } from "@/types/content";
@@ -97,6 +98,79 @@ export function ChatInterface({
   const baselineRef = useRef<WebsiteContent>(initialContent);
   const pendingRefreshRef = useRef(false);
   const sidebarRef = useRef<HTMLElement>(null);
+
+  // Content history for undo/redo functionality
+  const {
+    canUndo,
+    canRedo,
+    undoCount,
+    redoCount,
+    pushState: pushHistoryState,
+    undo: undoHistory,
+    redo: redoHistory,
+    reset: resetHistory,
+  } = useContentHistory({
+    initialContent,
+    maxHistory: 50,
+  });
+
+  // Handle undo action
+  const handleUndo = useCallback(async () => {
+    const previousContent = undoHistory();
+    if (previousContent) {
+      setDraftContent(previousContent);
+      
+      // Persist to cache
+      await fetch(`/api/content/${site.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(previousContent),
+      });
+
+      // Recompute changes against baseline
+      const changes = diffWebsiteContent(baselineRef.current, previousContent);
+      const meaningfulChanges = changes.filter(
+        (change) => !(change.sectionId === "metadata" && change.field === "lastModified")
+      );
+      const attributedChanges = meaningfulChanges.map((change) => ({
+        ...change,
+        source: "ai" as const,
+        timestamp: new Date().toISOString(),
+      }));
+      
+      setPreviewChanges(attributedChanges);
+      setCommitMessage(buildCommitMessage(attributedChanges));
+    }
+  }, [undoHistory, site.id]);
+
+  // Handle redo action
+  const handleRedo = useCallback(async () => {
+    const nextContent = redoHistory();
+    if (nextContent) {
+      setDraftContent(nextContent);
+      
+      // Persist to cache
+      await fetch(`/api/content/${site.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nextContent),
+      });
+
+      // Recompute changes against baseline
+      const changes = diffWebsiteContent(baselineRef.current, nextContent);
+      const meaningfulChanges = changes.filter(
+        (change) => !(change.sectionId === "metadata" && change.field === "lastModified")
+      );
+      const attributedChanges = meaningfulChanges.map((change) => ({
+        ...change,
+        source: "ai" as const,
+        timestamp: new Date().toISOString(),
+      }));
+      
+      setPreviewChanges(attributedChanges);
+      setCommitMessage(buildCommitMessage(attributedChanges));
+    }
+  }, [redoHistory, site.id]);
 
   // Handle sidebar resize
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -291,6 +365,12 @@ Section contents: ${JSON.stringify(section.content, null, 2)}`;
       }
       const body = await response.json();
       const nextContent = body.content as WebsiteContent;
+      
+      // Push current state to history before updating (for undo support)
+      if (draftContent && JSON.stringify(draftContent) !== JSON.stringify(nextContent)) {
+        pushHistoryState(nextContent, payloadExplanation || "AI content update", "ai");
+      }
+      
       setDraftContent(nextContent);
       const changes = diffAgainstBaseline(nextContent);
 
@@ -328,7 +408,7 @@ Section contents: ${JSON.stringify(section.content, null, 2)}`;
       // statusMessage is now managed by the publish hook, so we skip that
       // preview updates are now automatic via the effect
     },
-    [diffAgainstBaseline, site.id]
+    [diffAgainstBaseline, site.id, draftContent, pushHistoryState]
   );
 
   const handleSend = useCallback(
@@ -365,12 +445,13 @@ Section contents: ${JSON.stringify(section.content, null, 2)}`;
     setPreviewChanges([]);
     setCommitMessage("[CogniCMS] Content update");
     resetPublishState();
+    resetHistory(baselineRef.current); // Reset undo/redo history
     await fetch(`/api/content/${site.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(baselineRef.current),
     });
-  }, [site.id, resetPublishState]);
+  }, [site.id, resetPublishState, resetHistory]);
 
   // handlePublish is now delegated to the usePublishHandler hook
   // This wraps executePublish and clears errors
@@ -542,6 +623,9 @@ Section contents: ${JSON.stringify(section.content, null, 2)}`;
           throw new Error("Failed to save edit");
         }
 
+        // Push to history for undo support
+        pushHistoryState(updatedContent, `Edit ${field} in ${sectionId}`, "manual");
+
         // Update local state
         setDraftContent(updatedContent);
 
@@ -581,7 +665,7 @@ Section contents: ${JSON.stringify(section.content, null, 2)}`;
         setClientError((err as Error).message);
       }
     },
-    [draftContent, diffAgainstBaseline, previewChanges, site.id]
+    [draftContent, diffAgainstBaseline, previewChanges, site.id, pushHistoryState]
   );
 
   const handleDiscardChange = useCallback(
@@ -704,14 +788,15 @@ Section contents: ${JSON.stringify(section.content, null, 2)}`;
     [publishState, isChatStreaming, previewChanges.length]
   );
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts - Ctrl+Z for undo, Ctrl+Y/Ctrl+Shift+Z for redo
   useEditorShortcuts({
     onSaveAction: () => {
       if (!disablePublish) {
         handlePublish();
       }
     },
-    onUndoAction: handleReset,
+    onUndoAction: handleUndo,
+    onRedoAction: handleRedo,
   });
 
   useEffect(() => {
@@ -786,6 +871,21 @@ Section contents: ${JSON.stringify(section.content, null, 2)}`;
                 aiModel="z-ai/glm-4.6"
                 unpublishedChanges={pendingCount}
               />
+            </div>
+            {/* Undo/Redo Controls */}
+            <div className="mt-2 flex items-center justify-between">
+              <UndoRedoControls
+                canUndo={canUndo}
+                canRedo={canRedo}
+                undoCount={undoCount}
+                redoCount={redoCount}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+                disabled={isChatStreaming || publishState === "publishing"}
+              />
+              <span className="text-[9px] text-slate-400">
+                {canUndo || canRedo ? "Ctrl+Z / Ctrl+Y" : ""}
+              </span>
             </div>
           </div>
 

@@ -76,7 +76,13 @@ export function useEditorShortcuts({
       meta: true,
       shift: true,
       callback: () => onRedoAction?.(),
-      description: "Redo",
+      description: "Redo (Ctrl+Shift+Z)",
+    },
+    {
+      key: "y",
+      meta: true,
+      callback: () => onRedoAction?.(),
+      description: "Redo (Ctrl+Y)",
     },
     {
       key: "k",
